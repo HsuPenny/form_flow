@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:flutter_form_flow/data/app_state.dart';
+import 'package:flutter_form_flow/data/repositories/mock_auth_repository.dart';
+import 'package:flutter_form_flow/data/repositories/mock_form_repository.dart';
 import 'package:flutter_form_flow/main.dart';
 
 void main() {
@@ -9,14 +11,22 @@ void main() {
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
-    await tester.pumpWidget(MyApp(state: AppState()));
+    await tester.pumpWidget(
+      MyApp(
+        state: AppState(
+          auth: MockAuthRepository(),
+          forms: MockFormRepository(),
+        ),
+      ),
+    );
     // Let the login intro animation play out.
     await tester.pumpAndSettle();
   }
 
   for (final size in const [Size(1280, 800), Size(390, 844)]) {
-    testWidgets('login → overview → tracking → settings at $size',
-        (tester) async {
+    testWidgets('login → overview → tracking → settings at $size', (
+      tester,
+    ) async {
       await pumpApp(tester, size);
       expect(find.text('進入你的工作區'), findsOneWidget);
 

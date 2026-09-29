@@ -26,18 +26,24 @@ class _SettingsPageState extends State<SettingsPage> {
     super.dispose();
   }
 
-  void _save() {
-    if (_name.text.trim().isEmpty || _email.text.trim().isEmpty) {
-      showToast(context, '顯示名稱與工作信箱不能空白');
+  Future<void> _save() async {
+    if (_name.text.trim().isEmpty) {
+      showToast(context, '顯示名稱不能空白');
       return;
     }
-    _app.updateProfile(
-      name: _name.text.trim(),
-      email: _email.text.trim(),
-      department: _dept.text.trim(),
+    final saved = await runOrToast(
+      context,
+      () => _app.updateProfile(
+        name: _name.text.trim(),
+        department: _dept.text.trim(),
+      ),
+      failure: '儲存失敗，請稍後再試',
     );
-    showToast(context, '已儲存變更');
+    if (saved && mounted) showToast(context, '已儲存變更');
   }
+
+  void _toggle(Future<void> Function() action) =>
+      runOrToast(context, action, failure: '設定更新失敗，請稍後再試');
 
   @override
   Widget build(BuildContext context) {
@@ -55,10 +61,8 @@ class _SettingsPageState extends State<SettingsPage> {
             TextField(controller: _name),
             const SizedBox(height: 14),
             const FieldLabel('工作信箱'),
-            TextField(
-              controller: _email,
-              keyboardType: TextInputType.emailAddress,
-            ),
+            // The sign-in email; changing it would need a confirmation flow.
+            TextField(controller: _email, readOnly: true, enabled: false),
             const SizedBox(height: 14),
             const FieldLabel('工作部門'),
             TextField(controller: _dept),
@@ -87,7 +91,7 @@ class _SettingsPageState extends State<SettingsPage> {
             subtitle: '有新的指派表單時通知我',
             trailing: AppSwitch(
               value: app.notifyAssigned,
-              onChanged: app.setNotifyAssigned,
+              onChanged: (v) => _toggle(() => app.setNotifyAssigned(v)),
             ),
           ),
           _SettingsRow(
@@ -97,7 +101,7 @@ class _SettingsPageState extends State<SettingsPage> {
             subtitle: '每週一收到工作區進度摘要',
             trailing: AppSwitch(
               value: app.weeklyDigest,
-              onChanged: app.setWeeklyDigest,
+              onChanged: (v) => _toggle(() => app.setWeeklyDigest(v)),
             ),
           ),
         ],
@@ -111,21 +115,6 @@ class _SettingsPageState extends State<SettingsPage> {
             title: '目前身份',
             subtitle: app.department,
             trailing: StatusBadge(app.role!.label),
-          ),
-          _SettingsRow(
-            icon: BrandGlyph.swap,
-            tone: _Tone.gray,
-            title: '切換示範身份',
-            subtitle: '預覽不同身份看到的內容',
-            trailing: const Icon(
-              Icons.chevron_right,
-              size: 20,
-              color: AppColors.input,
-            ),
-            onTap: () {
-              app.switchRole();
-              showToast(context, '已切換為${app.role!.label}');
-            },
           ),
         ],
       ),
@@ -327,9 +316,9 @@ class _SettingsRow extends StatelessWidget {
     required this.title,
     required this.trailing,
     this.subtitle,
-    this.onTap,
   }) : centered = false,
-       color = null;
+       color = null,
+       onTap = null;
 
   /// A single centered action, e.g. 登出.
   const _SettingsRow.centered({

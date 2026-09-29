@@ -1040,3 +1040,20 @@ void showToast(BuildContext context, String message) {
     ..hideCurrentSnackBar()
     ..showSnackBar(SnackBar(content: Text(message)));
 }
+
+/// Runs [action]; if it throws, shows [failure] as a toast. Returns whether
+/// it succeeded.
+Future<bool> runOrToast(
+  BuildContext context,
+  Future<void> Function() action, {
+  String failure = '連線失敗，請稍後再試',
+}) async {
+  try {
+    await action();
+    return true;
+  } catch (e) {
+    debugPrint('$e');
+    if (context.mounted) showToast(context, failure);
+    return false;
+  }
+}

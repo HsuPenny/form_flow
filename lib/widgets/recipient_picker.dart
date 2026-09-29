@@ -42,14 +42,11 @@ class RecipientField extends StatelessWidget {
       ),
       builder: (_) => RecipientPickerSheet(
         allMembers: allMembers,
-        initial: {for (final m in selected) m.name},
+        initial: {for (final m in selected) m.id},
       ),
     );
     if (result != null) {
-      onChanged(
-        false,
-        allMembers.where((m) => result.contains(m.name)).toList(),
-      );
+      onChanged(false, allMembers.where((m) => result.contains(m.id)).toList());
     }
   }
 
@@ -129,10 +126,10 @@ class RecipientField extends StatelessWidget {
 
   /// A whole department collapses into one chip; otherwise one chip per person.
   List<Widget> _chips() {
-    final names = {for (final m in selected) m.name};
+    final ids = {for (final m in selected) m.id};
     return [
       for (final entry in groupByDepartment(allMembers).entries)
-        if (entry.value.every((m) => names.contains(m.name)))
+        if (entry.value.every((m) => ids.contains(m.id)))
           _Chip(
             icon: Icons.group_outlined,
             label: '${entry.key} (${entry.value.length})',
@@ -140,7 +137,7 @@ class RecipientField extends StatelessWidget {
           )
         else
           for (final m in entry.value)
-            if (names.contains(m.name))
+            if (ids.contains(m.id))
               _Chip(icon: Icons.person_outline, label: m.name),
     ];
   }
@@ -191,7 +188,7 @@ class _Chip extends StatelessWidget {
 }
 
 /// Bottom sheet: departments with tri-state checkboxes that expand to show
-/// their members. Pops with the selected member names.
+/// their members. Pops with the selected member ids.
 class RecipientPickerSheet extends StatefulWidget {
   const RecipientPickerSheet({
     super.key,
@@ -214,18 +211,17 @@ class _RecipientPickerSheetState extends State<RecipientPickerSheet> {
   late final _groups = groupByDepartment(widget.allMembers);
 
   void _toggleDepartment(List<Member> members) {
-    final all = members.every((m) => _selected.contains(m.name));
+    final all = members.every((m) => _selected.contains(m.id));
     setState(() {
       for (final m in members) {
-        all ? _selected.remove(m.name) : _selected.add(m.name);
+        all ? _selected.remove(m.id) : _selected.add(m.id);
       }
     });
   }
 
   void _toggleMember(Member m) => setState(
-    () => _selected.contains(m.name)
-        ? _selected.remove(m.name)
-        : _selected.add(m.name),
+    () =>
+        _selected.contains(m.id) ? _selected.remove(m.id) : _selected.add(m.id),
   );
 
   @override
@@ -263,7 +259,7 @@ class _RecipientPickerSheetState extends State<RecipientPickerSheet> {
           rows.add(
             _MemberRow(
               member: m,
-              selected: _selected.contains(m.name),
+              selected: _selected.contains(m.id),
               onTap: () => _toggleMember(m),
             ),
           );
@@ -378,7 +374,7 @@ class _DepartmentRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final count = members.where((m) => selected.contains(m.name)).length;
+    final count = members.where((m) => selected.contains(m.id)).length;
     final all = count == members.length;
     final summary = all
         ? '全部'

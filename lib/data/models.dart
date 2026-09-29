@@ -4,7 +4,6 @@ enum Role { admin, member }
 
 extension RoleLabel on Role {
   String get label => this == Role.admin ? '管理員' : '團隊成員';
-  String get hint => this == Role.admin ? '建立表單、查看回覆' : '填寫指派給你的表單';
 }
 
 enum QuestionType {
@@ -56,13 +55,59 @@ extension QuestionTypeInfo on QuestionType {
 enum FormStatus { draft, pending, completed }
 
 class Member {
-  const Member(this.name, this.department);
+  const Member(this.id, this.name, this.department);
 
+  final String id;
   final String name;
   final String department;
 
+  @override
+  bool operator ==(Object other) => other is Member && other.id == id;
+
+  @override
+  int get hashCode => id.hashCode;
+
   /// Two-character avatar label, as shown in the demo ("林郁婷" → "林郁").
   String get initials => name.length <= 2 ? name : name.substring(0, 2);
+}
+
+class UserProfile {
+  const UserProfile({
+    required this.id,
+    required this.role,
+    required this.email,
+    required this.displayName,
+    required this.department,
+    this.notifyAssigned = true,
+    this.weeklyDigest = false,
+  });
+
+  final String id;
+
+  /// Decided by the backend; users cannot change their own role.
+  final Role role;
+  final String email;
+  final String displayName;
+  final String department;
+  final bool notifyAssigned;
+  final bool weeklyDigest;
+
+  Member get asMember => Member(id, displayName, department);
+
+  UserProfile copyWith({
+    String? displayName,
+    String? department,
+    bool? notifyAssigned,
+    bool? weeklyDigest,
+  }) => UserProfile(
+    id: id,
+    role: role,
+    email: email,
+    displayName: displayName ?? this.displayName,
+    department: department ?? this.department,
+    notifyAssigned: notifyAssigned ?? this.notifyAssigned,
+    weeklyDigest: weeklyDigest ?? this.weeklyDigest,
+  );
 }
 
 class Question {
@@ -143,10 +188,10 @@ class FormItem {
   int get percent => (progress * 100).round();
   int get estimatedMinutes => (questions.length * 1.2).ceil().clamp(1, 60);
 
-  bool hasResponded(Member m) => responses.any((r) => r.member.name == m.name);
+  bool hasResponded(Member m) => responses.any((r) => r.member == m);
   FormResponse? responseOf(Member m) {
     for (final r in responses) {
-      if (r.member.name == m.name) return r;
+      if (r.member == m) return r;
     }
     return null;
   }
