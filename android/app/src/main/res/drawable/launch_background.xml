@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Brand gradient, matching the first frame of the Flutter splash screen
+     (AppGradients.brand: top-left #FFB27A to bottom-right #F4782F). -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:angle="315"
+                android:startColor="#FFB27A"
+                android:endColor="#F4782F"
+                android:type="linear" />
+        </shape>
+    </item>
+</layer-list>
