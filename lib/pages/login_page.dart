@@ -1,11 +1,10 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 
 import '../data/app_state.dart';
 import '../data/repositories/auth_repository.dart';
 import '../theme/app_theme.dart';
 import '../widgets/common.dart';
+import 'forgot_password_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key, this.playIntro = false, this.onIntroDone});
@@ -25,8 +24,9 @@ class _LoginPageState extends State<LoginPage>
   final _name = TextEditingController();
   final _email = TextEditingController();
   final _password = TextEditingController();
+  final _confirm = TextEditingController();
 
-  /// Sign-up mode adds a 顯示名稱 field and creates the account.
+  /// Sign-up mode adds 顯示名稱 and 確認密碼 fields and creates the account.
   bool _signUp = false;
   bool _busy = false;
 
@@ -75,6 +75,7 @@ class _LoginPageState extends State<LoginPage>
     _name.dispose();
     _email.dispose();
     _password.dispose();
+    _confirm.dispose();
     super.dispose();
   }
 
@@ -116,6 +117,7 @@ class _LoginPageState extends State<LoginPage>
     if (email.isEmpty) return '請輸入工作信箱';
     if (password.isEmpty) return '請輸入密碼';
     if (_signUp && password.length < 6) return '密碼至少需要 6 個字元';
+    if (_signUp && password != _confirm.text) return '兩次輸入的密碼不一致';
     return null;
   }
 
@@ -148,6 +150,15 @@ class _LoginPageState extends State<LoginPage>
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  void _forgotPassword() {
+    Navigator.push(
+      context,
+      MaterialPageRoute<void>(
+        builder: (_) => ForgotPasswordPage(email: _email.text.trim()),
+      ),
+    );
   }
 
   @override
@@ -230,7 +241,7 @@ class _LoginPageState extends State<LoginPage>
         Positioned.fromRect(
           rect: rect,
           child: CustomPaint(
-            painter: _AssemblingMark(
+            painter: AssemblingMark(
               stem: _step(150, 450, Curves.easeOutBack),
               arm1: _step(300, 600, Curves.easeOutBack),
               arm2: _step(450, 750, Curves.easeOutBack),
@@ -369,14 +380,40 @@ class _LoginPageState extends State<LoginPage>
             ),
             const SizedBox(height: 18),
             const FieldLabel('密碼'),
-            TextField(
+            PasswordField(
               controller: _password,
-              obscureText: true,
-              autofillHints: [
-                _signUp ? AutofillHints.newPassword : AutofillHints.password,
-              ],
-              onSubmitted: (_) => _enter(),
+              newPassword: _signUp,
+              textInputAction: _signUp ? TextInputAction.next : null,
+              onSubmitted: _signUp ? null : (_) => _enter(),
             ),
+            if (_signUp) ...[
+              const SizedBox(height: 18),
+              const FieldLabel('確認密碼'),
+              PasswordField(
+                controller: _confirm,
+                newPassword: true,
+                onSubmitted: (_) => _enter(),
+              ),
+            ],
+            if (!_signUp) ...[
+              const SizedBox(height: 10),
+              Container(
+                alignment: Alignment.centerRight,
+                padding: const EdgeInsets.only(bottom: 8),
+                child: InkWell(
+                  onTap: _busy ? null : _forgotPassword,
+                  borderRadius: BorderRadius.circular(4),
+                  child: const Text(
+                    '忘記密碼？',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.primaryDeep,
+                    ),
+                  ),
+                ),
+              ),
+            ],
             const SizedBox(height: 20),
             SizedBox(
               width: double.infinity,
@@ -412,91 +449,4 @@ class _LoginPageState extends State<LoginPage>
       ),
     );
   }
-}
-
-/// The bare white [LogoMark], drawn part by part so the intro can animate
-/// each piece.
-class _AssemblingMark extends CustomPainter {
-  const _AssemblingMark({
-    required this.stem,
-    required this.arm1,
-    required this.arm2,
-    required this.shadow,
-    required this.spark1,
-    required this.spark2,
-  });
-
-  final double stem, arm1, arm2, shadow, spark1, spark2;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    const bounds = LogoGeometry.bareBounds;
-    canvas.save();
-    canvas.scale(size.width / bounds.width);
-    canvas.translate(-bounds.left, -bounds.top);
-
-    const bars = LogoGeometry.bars;
-    if (shadow > 0) {
-      final paint = Paint()
-        ..color = LogoGeometry.shadow.withValues(alpha: 0.4 * shadow);
-      for (final b in bars) {
-        canvas.drawRRect(b.shift(LogoGeometry.shadowOffset), paint);
-      }
-    }
-
-    // Stem grows up from its bottom edge.
-    if (stem > 0) {
-      final b = bars[0];
-      canvas.save();
-      canvas.translate(0, b.bottom);
-      canvas.scale(1, stem);
-      canvas.translate(0, -b.bottom);
-      _bar(canvas, b, 1);
-      canvas.restore();
-    }
-    // Arms slide in from the right while fading in.
-    for (final (b, t) in [(bars[1], arm1), (bars[2], arm2)]) {
-      if (t <= 0) continue;
-      _bar(canvas, b.shift(Offset(30 * (1 - t), 0)), t.clamp(0, 1));
-    }
-
-    // Sparkles pop in with a quarter turn.
-    for (final ((c, r), t) in [
-      (LogoGeometry.sparkles[0], spark1),
-      (LogoGeometry.sparkles[1], spark2),
-    ]) {
-      if (t <= 0) continue;
-      canvas.save();
-      canvas.translate(c.dx, c.dy);
-      canvas.rotate(-math.pi / 2 * (1 - t));
-      canvas.scale(t);
-      paintSparkle(canvas, Offset.zero, r, Paint()..color = Colors.white);
-      canvas.restore();
-    }
-    canvas.restore();
-  }
-
-  /// A white bar with the logo's light top edge.
-  void _bar(Canvas canvas, RRect b, double opacity) {
-    canvas.drawRRect(
-      b,
-      Paint()..color = Colors.white.withValues(alpha: opacity),
-    );
-    canvas.save();
-    canvas.clipRRect(b);
-    canvas.drawRect(
-      Rect.fromLTWH(b.left, b.top, b.width, 4.5),
-      Paint()..color = LogoGeometry.edge.withValues(alpha: opacity),
-    );
-    canvas.restore();
-  }
-
-  @override
-  bool shouldRepaint(_AssemblingMark old) =>
-      old.stem != stem ||
-      old.arm1 != arm1 ||
-      old.arm2 != arm2 ||
-      old.shadow != shadow ||
-      old.spark1 != spark1 ||
-      old.spark2 != spark2;
 }
