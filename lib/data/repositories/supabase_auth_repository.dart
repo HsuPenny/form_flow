@@ -45,7 +45,7 @@ class SupabaseAuthRepository implements AuthRepository {
   }
 
   @override
-  Future<UserProfile> signUp({
+  Future<UserProfile?> signUp({
     required String email,
     required String password,
     required String displayName,
@@ -61,11 +61,35 @@ class SupabaseAuthRepository implements AuthRepository {
         },
       ),
     );
-    // Only the user comes back when "Confirm email" is on in the project.
-    if (json['access_token'] == null) {
-      throw const AuthFailure('註冊成功！請先到信箱點擊確認連結，再回來登入');
-    }
+    // Only the user comes back when "Confirm email" is on in the project;
+    // the confirmation email then carries the code.
+    if (json['access_token'] == null) return null;
     return _start(json);
+  }
+
+  /// The code is the "Confirm signup" template's `{{ .Token }}`.
+  @override
+  Future<UserProfile> verifySignUp({
+    required String email,
+    required String code,
+  }) async {
+    final json = await _authCall(
+      () => _dio.post(
+        '/auth/v1/verify',
+        data: {'type': 'signup', 'email': email, 'token': code},
+      ),
+    );
+    return _start(json);
+  }
+
+  @override
+  Future<void> resendSignUpCode({required String email}) async {
+    await _authCall(
+      () => _dio.post(
+        '/auth/v1/resend',
+        data: {'type': 'signup', 'email': email},
+      ),
+    );
   }
 
   /// Supabase answers the same way whether or not the email has an account,
@@ -82,10 +106,9 @@ class SupabaseAuthRepository implements AuthRepository {
   /// The code is the email template's `{{ .Token }}`; verifying it returns a
   /// session, which is then allowed to change the password.
   @override
-  Future<UserProfile> resetPassword({
+  Future<void> verifyRecoveryCode({
     required String email,
     required String code,
-    required String newPassword,
   }) async {
     final json = await _authCall(
       () => _dio.post(
@@ -94,17 +117,20 @@ class SupabaseAuthRepository implements AuthRepository {
       ),
     );
     await _sessions.save(AuthSession.fromAuthResponse(json));
-    try {
-      await _authCall(
-        () => _dio.put('/auth/v1/user', data: {'password': newPassword}),
-      );
-    } on AuthFailure {
-      // Don't leave the user signed in with the old password unchanged.
-      await _sessions.clear();
-      rethrow;
-    }
+  }
+
+  /// Uses the session from [verifyRecoveryCode]. A rejected password (e.g.
+  /// too weak) keeps it, so the user can try another.
+  @override
+  Future<UserProfile> resetPassword({required String newPassword}) async {
+    await _authCall(
+      () => _dio.put('/auth/v1/user', data: {'password': newPassword}),
+    );
     return _fetchProfile();
   }
+
+  @override
+  Future<void> cancelPasswordReset() => signOut();
 
   /// Supabase doesn't ask for the current password when changing it, so it
   /// is checked here by signing in with it first.
@@ -123,9 +149,8 @@ class SupabaseAuthRepository implements AuthRepository {
       );
     } on DioException catch (e) {
       throw switch (_errorCode(e)) {
-        'invalid_credentials' || 'invalid_grant' => const AuthFailure(
-          '目前的密碼不正確',
-        ),
+        'invalid_credentials' ||
+        'invalid_grant' => const AuthFailure('目前的密碼不正確'),
         _ => _failure(e),
       };
     }
@@ -215,10 +240,12 @@ class SupabaseAuthRepository implements AuthRepository {
   static AuthFailure _failure(DioException e) {
     final body = e.response?.data;
     if (body is! Map) return const AuthFailure('無法連線，請檢查網路後再試');
+    if (_errorCode(e) == 'email_not_confirmed') {
+      return const EmailNotConfirmed();
+    }
     final message = body['msg'] ?? body['error_description'] ?? body['message'];
     return AuthFailure(switch (_errorCode(e)) {
       'invalid_credentials' || 'invalid_grant' => '信箱或密碼錯誤',
-      'email_not_confirmed' => '這個信箱還沒完成驗證，請先到信箱點擊確認連結',
       'user_already_exists' || 'email_exists' => '這個信箱已經註冊過，請直接登入',
       'weak_password' => '密碼強度不足，至少需要 6 個字元',
       'same_password' => '新密碼不能和舊密碼相同',

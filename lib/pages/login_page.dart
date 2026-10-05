@@ -5,6 +5,7 @@ import '../data/repositories/auth_repository.dart';
 import '../theme/app_theme.dart';
 import '../widgets/common.dart';
 import 'forgot_password_page.dart';
+import 'verify_code_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key, this.playIntro = false, this.onIntroDone});
@@ -135,13 +136,19 @@ class _LoginPageState extends State<LoginPage>
     final app = AppScope.of(context);
     setState(() => _busy = true);
     try {
-      _signUp
-          ? await app.signUp(
-              email: email,
-              password: password,
-              displayName: name,
-            )
-          : await app.login(email: email, password: password);
+      if (!_signUp) {
+        await app.login(email: email, password: password);
+      } else if (!await app.signUp(
+        email: email,
+        password: password,
+        displayName: name,
+      )) {
+        if (mounted) _verifyEmail(email, codeJustSent: true);
+      }
+    } on EmailNotConfirmed {
+      // An account whose sign-up was never finished; its code may have
+      // expired, so the page offers to send a new one.
+      if (mounted) _verifyEmail(email, codeJustSent: false);
     } on AuthFailure catch (e) {
       if (mounted) showToast(context, e.message);
     } catch (e) {
@@ -150,6 +157,19 @@ class _LoginPageState extends State<LoginPage>
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  void _verifyEmail(String email, {required bool codeJustSent}) {
+    Navigator.push(
+      context,
+      MaterialPageRoute<void>(
+        builder: (_) => VerifyCodePage(
+          purpose: CodePurpose.signUp,
+          email: email,
+          codeJustSent: codeJustSent,
+        ),
+      ),
+    );
   }
 
   void _forgotPassword() {

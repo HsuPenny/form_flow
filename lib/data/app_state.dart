@@ -65,32 +65,43 @@ class AppState extends ChangeNotifier {
   Future<void> login({required String email, required String password}) async =>
       _enter(await _auth.signIn(email: email, password: password));
 
-  Future<void> signUp({
+  /// Returns false when the account needs the emailed code first; pass it
+  /// to [verifySignUp] to finish signing in.
+  Future<bool> signUp({
     required String email,
     required String password,
     required String displayName,
-  }) async => _enter(
-    await _auth.signUp(
+  }) async {
+    final profile = await _auth.signUp(
       email: email,
       password: password,
       displayName: displayName,
-    ),
-  );
+    );
+    if (profile == null) return false;
+    await _enter(profile);
+    return true;
+  }
+
+  Future<void> verifySignUp({
+    required String email,
+    required String code,
+  }) async => _enter(await _auth.verifySignUp(email: email, code: code));
+
+  Future<void> resendSignUpCode({required String email}) =>
+      _auth.resendSignUpCode(email: email);
 
   Future<void> sendPasswordReset({required String email}) =>
       _auth.sendPasswordReset(email: email);
 
-  Future<void> resetPassword({
+  Future<void> verifyRecoveryCode({
     required String email,
     required String code,
-    required String newPassword,
-  }) async => _enter(
-    await _auth.resetPassword(
-      email: email,
-      code: code,
-      newPassword: newPassword,
-    ),
-  );
+  }) => _auth.verifyRecoveryCode(email: email, code: code);
+
+  Future<void> resetPassword({required String newPassword}) async =>
+      _enter(await _auth.resetPassword(newPassword: newPassword));
+
+  Future<void> cancelPasswordReset() => _auth.cancelPasswordReset();
 
   Future<void> _enter(UserProfile profile) async {
     _profile = profile;

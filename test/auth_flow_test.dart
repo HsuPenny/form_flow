@@ -70,9 +70,67 @@ void main() {
     });
   }
 
-  testWidgets('forgot and reset password from the login page', (
+  testWidgets('sign-up asks for the emailed code before signing in', (
     tester,
   ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final state = AppState(
+      auth: MockAuthRepository(confirmEmail: true),
+      forms: MockFormRepository(),
+    );
+    await tester.pumpWidget(MyApp(state: state));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('還沒有帳號？建立帳號'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).at(0), '測試者');
+    await tester.enterText(find.byType(TextField).at(1), 'a@b.c');
+    await tester.enterText(find.byType(TextField).at(2), '123456');
+    await tester.enterText(find.byType(TextField).at(3), '123456');
+    await tester.tap(find.text('建立帳號'));
+    await tester.pumpAndSettle();
+    expect(state.isLoggedIn, false);
+    expect(find.text('註冊認證'), findsOneWidget);
+    expect(find.text('驗證碼已寄送至 a@b.c'), findsOneWidget);
+    // A code just went out, so resending waits.
+    expect(find.textContaining('秒）'), findsOneWidget);
+
+    // Backing out and signing in leads to the same page, where resending is
+    // allowed right away since this sign-in sent nothing.
+    await tester.tap(find.byTooltip('返回'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('已經有帳號了？登入'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).at(0), 'a@b.c');
+    await tester.enterText(find.byType(TextField).at(1), '123456');
+    await tester.tap(find.text('登入').last);
+    await tester.pumpAndSettle();
+    expect(state.isLoggedIn, false);
+    expect(find.text('註冊認證'), findsOneWidget);
+    expect(find.text('重新發送驗證碼'), findsOneWidget);
+
+    // "收不到驗證碼？" explains, and 修改信箱 goes back to the form.
+    await tester.tap(find.text('收不到驗證碼？'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('垃圾郵件匣'), findsOneWidget);
+    await tester.tap(find.text('知道了'));
+    await tester.pumpAndSettle();
+    expect(find.text('註冊認證'), findsOneWidget);
+
+    // Checked as soon as the last digit is in; no button to press.
+    await tester.enterText(find.byType(TextField), '12345');
+    await tester.pumpAndSettle();
+    expect(state.isLoggedIn, false);
+    await tester.enterText(find.byType(TextField), '123456');
+    await tester.pumpAndSettle();
+    expect(state.isLoggedIn, true);
+    expect(state.displayName, '測試者');
+    expect(find.text('註冊認證'), findsNothing);
+  });
+
+  testWidgets('forgot and reset password from the login page', (tester) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
@@ -84,8 +142,8 @@ void main() {
     await tester.pumpAndSettle();
 
     // The eye button reveals and hides the password.
-    bool obscured() => tester.widget<TextField>(find.byType(TextField).at(1))
-        .obscureText;
+    bool obscured() =>
+        tester.widget<TextField>(find.byType(TextField).at(1)).obscureText;
     expect(obscured(), true);
     await tester.tap(find.byTooltip('顯示密碼'));
     await tester.pump();
@@ -119,15 +177,14 @@ void main() {
 
     await tester.tap(find.text('寄送驗證碼'));
     await tester.pumpAndSettle();
-    expect(find.text('請到信箱查收'), findsOneWidget);
-
-    await tester.tap(find.text('輸入驗證碼'));
+    expect(find.text('忘記密碼認證'), findsOneWidget);
+    await tester.enterText(find.byType(TextField), '123456');
     await tester.pumpAndSettle();
-    expect(find.text('重設密碼'), findsOneWidget);
+
+    expect(find.text('設定新密碼'), findsOneWidget);
     expect(enabled('更新密碼'), false);
-    await tester.enterText(find.byType(TextField).at(0), '123456');
-    await tester.enterText(find.byType(TextField).at(1), 'newpass');
-    await tester.enterText(find.byType(TextField).at(2), 'other');
+    await tester.enterText(find.byType(TextField).at(0), 'newpass');
+    await tester.enterText(find.byType(TextField).at(1), 'other');
     await tester.pump();
     expect(enabled('更新密碼'), true);
     await tester.tap(find.text('更新密碼'));
@@ -135,13 +192,38 @@ void main() {
     expect(find.text('兩次輸入的密碼不一致'), findsOneWidget);
     expect(state.isLoggedIn, false);
 
-    await tester.enterText(find.byType(TextField).at(2), 'newpass');
+    await tester.enterText(find.byType(TextField).at(1), 'newpass');
     await tester.tap(find.text('更新密碼'));
     await tester.pumpAndSettle();
     // Signed in, with the pushed pages gone.
     expect(state.isLoggedIn, true);
-    expect(find.text('重設密碼'), findsNothing);
-    expect(find.text('請到信箱查收'), findsNothing);
+    expect(find.text('設定新密碼'), findsNothing);
+    expect(find.text('忘記密碼'), findsNothing);
+  });
+
+  testWidgets('leaving the new-password page cancels the reset', (
+    tester,
+  ) async {
+    final state = AppState(
+      auth: MockAuthRepository(),
+      forms: MockFormRepository(),
+    );
+    await tester.pumpWidget(MyApp(state: state));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).at(0), 'a@b.c');
+    await tester.tap(find.text('忘記密碼？'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('寄送驗證碼'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), '123456');
+    await tester.pumpAndSettle();
+    expect(find.text('設定新密碼'), findsOneWidget);
+
+    // Back skips the used-up code page.
+    await tester.tap(find.byTooltip('返回'));
+    await tester.pumpAndSettle();
+    expect(find.text('忘記密碼'), findsOneWidget);
+    expect(state.isLoggedIn, false);
   });
 
   testWidgets('a restored session plays the splash before the app', (
