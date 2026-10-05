@@ -1,6 +1,7 @@
 -- Test data: 17 members, 4 forms in different states, and
--- app@example.com.tw as admin. Run in the Supabase SQL Editor after both
--- migrations. Safe to run again: every row has a fixed id.
+-- app@example.com.tw as admin. Run in the Supabase SQL Editor after all the
+-- migrations (the members' departments must exist in public.departments).
+-- Safe to run again: every row has a fixed id.
 --
 -- Sign up app@example.com.tw in the app first; if it doesn't exist yet the
 -- script still runs, but that account isn't made admin or added to forms.
