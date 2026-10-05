@@ -330,7 +330,7 @@ class _RecipientPickerSheetState extends State<RecipientPickerSheet> {
           SafeArea(
             top: false,
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
               child: Row(
                 children: [
                   Text(
