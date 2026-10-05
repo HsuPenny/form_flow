@@ -1,91 +1,172 @@
+import 'dart:collection';
+
 import 'package:flutter/widgets.dart';
 
-import 'mock_data.dart';
 import 'models.dart';
+import 'repositories/auth_repository.dart';
+import 'repositories/form_repository.dart';
 
-/// In-memory app state for the demo. Nothing is persisted.
+/// App-wide view state. Reads and writes go through the repositories; this
+/// class keeps the latest results so widgets can read them synchronously.
+///
+/// Write methods throw when the backend rejects them; callers show the error.
 class AppState extends ChangeNotifier {
-  Role? role;
-  String email = 'lisa.wang@northstar.co';
-  String displayName = '王莉莎';
-  String department = '營運管理';
-  bool notifyAssigned = true;
-  bool weeklyDigest = false;
+  AppState({required AuthRepository auth, required FormRepository forms})
+    : _auth = auth,
+      _formRepo = forms;
 
-  final List<Member> members = MockData.members;
-  final List<FormItem> forms = MockData.forms();
+  final AuthRepository _auth;
+  final FormRepository _formRepo;
 
-  bool get isLoggedIn => role != null;
+  bool _signedIn = false;
+  bool _restoring = false;
+  UserProfile? _profile;
+  List<Member> _members = [];
+  List<FormItem> _forms = [];
+  List<String> _departments = [];
+
+  List<Member> get members => UnmodifiableListView(_members);
+  List<String> get departments => UnmodifiableListView(_departments);
+  List<FormItem> get forms => UnmodifiableListView(_forms);
+
+  /// Kept after logout so the shell can still render while it animates out.
+  Role? get role => _profile?.role;
+  Member get me => _profile!.asMember;
+  String get email => _profile?.email ?? '';
+  String get displayName => _profile?.displayName ?? '';
+  String get department => _profile?.department ?? '';
+  bool get notifyAssigned => _profile?.notifyAssigned ?? true;
+  bool get weeklyDigest => _profile?.weeklyDigest ?? false;
+
+  bool get isLoggedIn => _signedIn;
+
+  /// True while [restoreSession] runs, before we know which page to show.
+  bool get isRestoring => _restoring;
   bool get isAdmin => role == Role.admin;
   String get initials =>
       displayName.length <= 2 ? displayName : displayName.substring(0, 2);
 
-  void login(String email, Role role) {
-    this.email = email;
-    this.role = role;
+  /// Signs back in with the session saved by a previous launch, if any.
+  /// Stays signed out when that fails (e.g. offline).
+  Future<void> restoreSession() async {
+    _restoring = true;
     notifyListeners();
+    try {
+      final profile = await _auth.currentUser();
+      if (profile != null) await _enter(profile);
+    } catch (e) {
+      debugPrint('Could not restore session: $e');
+    } finally {
+      _restoring = false;
+      notifyListeners();
+    }
   }
 
-  void logout() {
-    role = null;
-    notifyListeners();
-  }
+  Future<void> login({required String email, required String password}) async =>
+      _enter(await _auth.signIn(email: email, password: password));
 
-  void switchRole() {
-    role = isAdmin ? Role.member : Role.admin;
-    notifyListeners();
-  }
-
-  void updateProfile({
-    required String name,
+  Future<void> signUp({
     required String email,
+    required String password,
+    required String displayName,
+  }) async => _enter(
+    await _auth.signUp(
+      email: email,
+      password: password,
+      displayName: displayName,
+    ),
+  );
+
+  Future<void> sendPasswordReset({required String email}) =>
+      _auth.sendPasswordReset(email: email);
+
+  Future<void> resetPassword({
+    required String email,
+    required String code,
+    required String newPassword,
+  }) async => _enter(
+    await _auth.resetPassword(
+      email: email,
+      code: code,
+      newPassword: newPassword,
+    ),
+  );
+
+  Future<void> _enter(UserProfile profile) async {
+    _profile = profile;
+    final (members, forms, departments) = await (
+      _formRepo.fetchMembers(),
+      _formRepo.fetchForms(),
+      // Only the settings dropdown needs these; don't block sign-in on them.
+      _formRepo.fetchDepartments().catchError((Object e) {
+        debugPrint('Could not load departments: $e');
+        return <String>[];
+      }),
+    ).wait;
+    _members = members;
+    _forms = forms;
+    _departments = departments;
+    _signedIn = true;
+    notifyListeners();
+  }
+
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) => _auth.changePassword(
+    currentPassword: currentPassword,
+    newPassword: newPassword,
+  );
+
+  Future<void> logout() async {
+    await _auth.signOut();
+    _signedIn = false;
+    notifyListeners();
+  }
+
+  Future<void> updateProfile({
+    required String name,
     required String department,
-  }) {
-    displayName = name;
-    this.email = email;
-    this.department = department;
+  }) => _saveProfile(
+    (p) => p.copyWith(displayName: name, department: department),
+  );
+
+  Future<void> setNotifyAssigned(bool v) =>
+      _saveProfile((p) => p.copyWith(notifyAssigned: v));
+
+  Future<void> setWeeklyDigest(bool v) =>
+      _saveProfile((p) => p.copyWith(weeklyDigest: v));
+
+  Future<void> _saveProfile(UserProfile Function(UserProfile) edit) async {
+    _profile = await _auth.updateProfile(edit(_profile!));
     notifyListeners();
   }
 
-  void setNotifyAssigned(bool v) {
-    notifyAssigned = v;
+  /// Creates [form], or updates the existing form with the same id.
+  Future<void> saveForm(FormItem form) async {
+    _putForm(await _formRepo.saveForm(form));
     notifyListeners();
   }
 
-  void setWeeklyDigest(bool v) {
-    weeklyDigest = v;
+  Future<void> deleteForm(FormItem form) async {
+    await _formRepo.deleteForm(form.id);
+    _forms.removeWhere((f) => f.id == form.id);
     notifyListeners();
   }
 
-  void addForm(FormItem form) {
-    forms.insert(0, form);
-    notifyListeners();
-  }
-
-  void replaceForm(FormItem old, FormItem updated) {
-    final i = forms.indexOf(old);
-    i < 0 ? forms.insert(0, updated) : forms[i] = updated;
-    notifyListeners();
-  }
-
-  void deleteForm(FormItem form) {
-    forms.remove(form);
-    notifyListeners();
-  }
-
-  void submitResponse(FormItem form, Answers answers) {
-    final me = Member(displayName, department);
-    form.responses.removeWhere((r) => r.member.name == me.name);
-    form.responses.add(
-      FormResponse(member: me, submittedAt: DateTime.now(), answers: answers),
+  Future<void> submitResponse(FormItem form, Answers answers) async {
+    final response = FormResponse(
+      member: me,
+      submittedAt: DateTime.now(),
+      answers: answers,
     );
-    if (!form.recipients.any((m) => m.name == me.name)) {
-      form.recipients.add(me);
-    }
-    if (form.respondedCount >= form.totalCount) {
-      form.status = FormStatus.completed;
-    }
+    _putForm(await _formRepo.submitResponse(form.id, response));
     notifyListeners();
+  }
+
+  void _putForm(FormItem form) {
+    final i = _forms.indexWhere((f) => f.id == form.id);
+    i < 0 ? _forms.insert(0, form) : _forms[i] = form;
   }
 }
 

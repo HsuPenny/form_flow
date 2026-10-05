@@ -188,10 +188,14 @@ class _OverviewPageState extends State<OverviewPage> {
         ],
       ),
     );
-    if (ok == true && mounted) {
-      AppScope.of(context).deleteForm(form);
-      showToast(context, '已刪除表單');
-    }
+    if (ok != true || !mounted) return;
+    final app = AppScope.of(context);
+    final deleted = await runOrToast(
+      context,
+      () => app.deleteForm(form),
+      failure: '刪除失敗，請稍後再試',
+    );
+    if (deleted && mounted) showToast(context, '已刪除表單');
   }
 }
 

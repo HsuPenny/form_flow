@@ -1,11 +1,10 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 
 import '../data/app_state.dart';
-import '../data/models.dart';
+import '../data/repositories/auth_repository.dart';
 import '../theme/app_theme.dart';
 import '../widgets/common.dart';
+import 'forgot_password_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key, this.playIntro = false, this.onIntroDone});
@@ -22,8 +21,14 @@ class LoginPage extends StatefulWidget {
 
 class _LoginPageState extends State<LoginPage>
     with SingleTickerProviderStateMixin {
-  late final _email = TextEditingController(text: 'lisa.wang@northstar.co');
-  Role _role = Role.admin;
+  final _name = TextEditingController();
+  final _email = TextEditingController();
+  final _password = TextEditingController();
+  final _confirm = TextEditingController();
+
+  /// Sign-up mode adds 顯示名稱 and 確認密碼 fields and creates the account.
+  bool _signUp = false;
+  bool _busy = false;
 
   static final _softWhite = Colors.white.withValues(alpha: 0.85);
 
@@ -67,7 +72,10 @@ class _LoginPageState extends State<LoginPage>
   @override
   void dispose() {
     _intro.dispose();
+    _name.dispose();
     _email.dispose();
+    _password.dispose();
+    _confirm.dispose();
     super.dispose();
   }
 
@@ -104,13 +112,53 @@ class _LoginPageState extends State<LoginPage>
     );
   }
 
-  void _enter() {
+  String? _validate(String name, String email, String password) {
+    if (_signUp && name.isEmpty) return '請輸入顯示名稱';
+    if (email.isEmpty) return '請輸入工作信箱';
+    if (password.isEmpty) return '請輸入密碼';
+    if (_signUp && password.length < 6) return '密碼至少需要 6 個字元';
+    if (_signUp && password != _confirm.text) return '兩次輸入的密碼不一致';
+    return null;
+  }
+
+  Future<void> _enter() async {
+    if (_busy) return;
+    final name = _name.text.trim();
     final email = _email.text.trim();
-    if (email.isEmpty) {
-      showToast(context, '請輸入工作信箱');
+    final password = _password.text;
+    final problem = _validate(name, email, password);
+    if (problem != null) {
+      showToast(context, problem);
       return;
     }
-    AppScope.of(context).login(email, _role);
+
+    final app = AppScope.of(context);
+    setState(() => _busy = true);
+    try {
+      _signUp
+          ? await app.signUp(
+              email: email,
+              password: password,
+              displayName: name,
+            )
+          : await app.login(email: email, password: password);
+    } on AuthFailure catch (e) {
+      if (mounted) showToast(context, e.message);
+    } catch (e) {
+      debugPrint('$e');
+      if (mounted) showToast(context, '連線失敗，請稍後再試');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  void _forgotPassword() {
+    Navigator.push(
+      context,
+      MaterialPageRoute<void>(
+        builder: (_) => ForgotPasswordPage(email: _email.text.trim()),
+      ),
+    );
   }
 
   @override
@@ -193,7 +241,7 @@ class _LoginPageState extends State<LoginPage>
         Positioned.fromRect(
           rect: rect,
           child: CustomPaint(
-            painter: _AssemblingMark(
+            painter: AssemblingMark(
               stem: _step(150, 450, Curves.easeOutBack),
               arm1: _step(300, 600, Curves.easeOutBack),
               arm2: _step(450, 750, Curves.easeOutBack),
@@ -314,43 +362,85 @@ class _LoginPageState extends State<LoginPage>
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (_signUp) ...[
+              const FieldLabel('顯示名稱'),
+              TextField(
+                controller: _name,
+                textInputAction: TextInputAction.next,
+                autofillHints: const [AutofillHints.name],
+              ),
+              const SizedBox(height: 18),
+            ],
             const FieldLabel('工作信箱'),
             TextField(
               controller: _email,
               keyboardType: TextInputType.emailAddress,
-              onSubmitted: (_) => _enter(),
+              textInputAction: TextInputAction.next,
+              autofillHints: const [AutofillHints.email],
             ),
             const SizedBox(height: 18),
-            const FieldLabel('登入身份'),
-            _RoleSwitch(
-              value: _role,
-              onChanged: (r) => setState(() => _role = r),
+            const FieldLabel('密碼'),
+            PasswordField(
+              controller: _password,
+              newPassword: _signUp,
+              textInputAction: _signUp ? TextInputAction.next : null,
+              onSubmitted: _signUp ? null : (_) => _enter(),
             ),
-            const SizedBox(height: 8),
-            Text(
-              _role.hint,
-              style: const TextStyle(
-                fontSize: 12,
-                color: AppColors.mutedForeground,
+            if (_signUp) ...[
+              const SizedBox(height: 18),
+              const FieldLabel('確認密碼'),
+              PasswordField(
+                controller: _confirm,
+                newPassword: true,
+                onSubmitted: (_) => _enter(),
               ),
-            ),
+            ],
+            if (!_signUp) ...[
+              const SizedBox(height: 10),
+              Container(
+                alignment: Alignment.centerRight,
+                padding: const EdgeInsets.only(bottom: 8),
+                child: InkWell(
+                  onTap: _busy ? null : _forgotPassword,
+                  borderRadius: BorderRadius.circular(4),
+                  child: const Text(
+                    '忘記密碼？',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.primaryDeep,
+                    ),
+                  ),
+                ),
+              ),
+            ],
             const SizedBox(height: 20),
             SizedBox(
               width: double.infinity,
               child: FilledButton.icon(
-                onPressed: _enter,
+                onPressed: _busy ? null : _enter,
                 iconAlignment: IconAlignment.end,
-                icon: const Icon(Icons.arrow_forward, size: 16),
-                label: const Text('使用示範身份進入'),
+                icon: _busy
+                    ? const SizedBox.square(
+                        dimension: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.arrow_forward, size: 16),
+                label: Text(_signUp ? '建立帳號' : '登入'),
               ),
             ),
-            const SizedBox(height: 14),
-            const Center(
-              child: Text(
-                '你的資料只保存在這個裝置中',
-                style: TextStyle(
-                  fontSize: 11,
-                  color: AppColors.mutedForeground,
+            const SizedBox(height: 8),
+            Center(
+              child: TextButton(
+                onPressed: _busy
+                    ? null
+                    : () => setState(() => _signUp = !_signUp),
+                child: Text(
+                  _signUp ? '已經有帳號了？登入' : '還沒有帳號？建立帳號',
+                  style: const TextStyle(fontSize: 12),
                 ),
               ),
             ),
@@ -359,191 +449,4 @@ class _LoginPageState extends State<LoginPage>
       ),
     );
   }
-}
-
-/// Two-option segmented control for picking the demo role.
-///
-/// Like [SegmentedTabs]: one white indicator slides between the options and
-/// the label colors animate on the same timing. Fading each option's own
-/// background instead leaves both half-white mid-way, which reads as a flash.
-class _RoleSwitch extends StatelessWidget {
-  const _RoleSwitch({required this.value, required this.onChanged});
-
-  final Role value;
-  final ValueChanged<Role> onChanged;
-
-  static const _duration = Duration(milliseconds: 220);
-  static const _curve = Curves.easeOutCubic;
-
-  static IconData _icon(Role r) => switch (r) {
-    Role.admin => Icons.admin_panel_settings_outlined,
-    Role.member => Icons.person_outline,
-  };
-
-  @override
-  Widget build(BuildContext context) {
-    const roles = Role.values;
-    final index = roles.indexOf(value);
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: AppColors.muted,
-        borderRadius: BorderRadius.circular(AppRadius.sm),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Stack(
-        children: [
-          Positioned.fill(
-            child: AnimatedAlign(
-              duration: _duration,
-              curve: _curve,
-              alignment: Alignment(-1 + 2 * index / (roles.length - 1), 0),
-              child: FractionallySizedBox(
-                widthFactor: 1 / roles.length,
-                heightFactor: 1,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(8),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.foreground.withValues(alpha: 0.08),
-                        blurRadius: 4,
-                        offset: const Offset(0, 1),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-          Row(
-            children: [
-              for (final r in roles)
-                Expanded(
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: () => onChanged(r),
-                    child: TweenAnimationBuilder<Color?>(
-                      duration: _duration,
-                      curve: _curve,
-                      tween: ColorTween(
-                        end: r == value
-                            ? AppColors.primaryDeep
-                            : AppColors.mutedForeground,
-                      ),
-                      builder: (context, color, _) => Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(_icon(r), size: 16, color: color),
-                            const SizedBox(width: 6),
-                            Text(
-                              r.label,
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: color,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// The bare white [LogoMark], drawn part by part so the intro can animate
-/// each piece.
-class _AssemblingMark extends CustomPainter {
-  const _AssemblingMark({
-    required this.stem,
-    required this.arm1,
-    required this.arm2,
-    required this.shadow,
-    required this.spark1,
-    required this.spark2,
-  });
-
-  final double stem, arm1, arm2, shadow, spark1, spark2;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    const bounds = LogoGeometry.bareBounds;
-    canvas.save();
-    canvas.scale(size.width / bounds.width);
-    canvas.translate(-bounds.left, -bounds.top);
-
-    const bars = LogoGeometry.bars;
-    if (shadow > 0) {
-      final paint = Paint()
-        ..color = LogoGeometry.shadow.withValues(alpha: 0.4 * shadow);
-      for (final b in bars) {
-        canvas.drawRRect(b.shift(LogoGeometry.shadowOffset), paint);
-      }
-    }
-
-    // Stem grows up from its bottom edge.
-    if (stem > 0) {
-      final b = bars[0];
-      canvas.save();
-      canvas.translate(0, b.bottom);
-      canvas.scale(1, stem);
-      canvas.translate(0, -b.bottom);
-      _bar(canvas, b, 1);
-      canvas.restore();
-    }
-    // Arms slide in from the right while fading in.
-    for (final (b, t) in [(bars[1], arm1), (bars[2], arm2)]) {
-      if (t <= 0) continue;
-      _bar(canvas, b.shift(Offset(30 * (1 - t), 0)), t.clamp(0, 1));
-    }
-
-    // Sparkles pop in with a quarter turn.
-    for (final ((c, r), t) in [
-      (LogoGeometry.sparkles[0], spark1),
-      (LogoGeometry.sparkles[1], spark2),
-    ]) {
-      if (t <= 0) continue;
-      canvas.save();
-      canvas.translate(c.dx, c.dy);
-      canvas.rotate(-math.pi / 2 * (1 - t));
-      canvas.scale(t);
-      paintSparkle(canvas, Offset.zero, r, Paint()..color = Colors.white);
-      canvas.restore();
-    }
-    canvas.restore();
-  }
-
-  /// A white bar with the logo's light top edge.
-  void _bar(Canvas canvas, RRect b, double opacity) {
-    canvas.drawRRect(
-      b,
-      Paint()..color = Colors.white.withValues(alpha: opacity),
-    );
-    canvas.save();
-    canvas.clipRRect(b);
-    canvas.drawRect(
-      Rect.fromLTWH(b.left, b.top, b.width, 4.5),
-      Paint()..color = LogoGeometry.edge.withValues(alpha: opacity),
-    );
-    canvas.restore();
-  }
-
-  @override
-  bool shouldRepaint(_AssemblingMark old) =>
-      old.stem != stem ||
-      old.arm1 != arm1 ||
-      old.arm2 != arm2 ||
-      old.shadow != shadow ||
-      old.spark1 != spark1 ||
-      old.spark2 != spark2;
 }

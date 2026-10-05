@@ -37,7 +37,7 @@ class _FillFormPageState extends State<FillFormPage> {
       if (QuestionList.isAnswered(_answers[i])) i,
   ].length;
 
-  void _submit() {
+  Future<void> _submit() async {
     final missing = _missingRequired;
     if (missing.isNotEmpty) {
       setState(() => _showErrors = true);
@@ -54,8 +54,13 @@ class _FillFormPageState extends State<FillFormPage> {
       }
       return;
     }
-    AppScope.of(context).submitResponse(widget.form, Map.of(_answers));
-    setState(() => _submitted = true);
+    final app = AppScope.of(context);
+    final sent = await runOrToast(
+      context,
+      () => app.submitResponse(widget.form, Map.of(_answers)),
+      failure: '送出失敗，請稍後再試',
+    );
+    if (sent && mounted) setState(() => _submitted = true);
   }
 
   @override
@@ -205,7 +210,7 @@ class _Done extends StatelessWidget {
   Widget build(BuildContext context) {
     final app = AppScope.of(context);
     final nav = ShellNav.of(context);
-    final me = Member(app.displayName, app.department);
+    final me = app.me;
     final todo =
         app.forms
             .where(

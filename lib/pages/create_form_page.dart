@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:uuid/uuid.dart';
 
 import '../data/app_state.dart';
 import '../data/models.dart';
@@ -79,10 +80,10 @@ class _CreateFormPageState extends State<CreateFormPage> {
       (q.type.hasOptions &&
           q.options.where((o) => o.trim().isNotEmpty).length < 2);
 
-  void _finish({required bool publish}) {
+  Future<void> _finish({required bool publish}) async {
     final draft = widget.draft;
     final form = FormItem(
-      id: draft?.id ?? 'f${DateTime.now().microsecondsSinceEpoch}',
+      id: draft?.id ?? const Uuid().v4(),
       title: _title.text.trim(),
       description: _desc.text.trim(),
       deadline: _deadline,
@@ -98,7 +99,12 @@ class _CreateFormPageState extends State<CreateFormPage> {
       recipients: [..._finalRecipients],
     );
     final app = AppScope.of(context);
-    draft == null ? app.addForm(form) : app.replaceForm(draft, form);
+    final saved = await runOrToast(
+      context,
+      () => app.saveForm(form),
+      failure: '儲存失敗，請稍後再試',
+    );
+    if (!saved || !mounted) return;
     showToast(context, publish ? '表單已發佈' : (draft == null ? '已儲存草稿' : '已更新草稿'));
     ShellNav.of(context).closeSubPage();
   }

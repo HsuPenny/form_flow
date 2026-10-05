@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../data/models.dart';
@@ -634,12 +636,8 @@ class _BannerPainter extends CustomPainter {
   bool shouldRepaint(_BannerPainter oldDelegate) => false;
 }
 
-/// Dropdown field whose opened menu lines up exactly with the field.
-///
-/// Flutter sizes the menu from the inner button and then pads it 16px/24px
-/// outward, so with the field's own content padding the menu overhangs the
-/// field. Here the button fills the field (the horizontal padding moves into
-/// the button) and `alignedDropdown` drops that extra margin.
+/// Select field that looks like an input and opens its options in a
+/// bottom sheet, with the current value checked.
 class AppDropdownField<T> extends StatelessWidget {
   const AppDropdownField({
     super.key,
@@ -662,50 +660,144 @@ class AppDropdownField<T> extends StatelessWidget {
   final IconData? icon;
   final Color? fillColor;
 
+  int get _selectedIndex => items.indexWhere((e) => e.$1 == value);
+
+  Future<void> _openSheet(BuildContext context) async {
+    // Returns an index rather than the value, so a null option (e.g.
+    // "全部表單") is distinguishable from dismissing the sheet.
+    final picked = await showModalBottomSheet<int>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.white,
+      constraints: const BoxConstraints(maxWidth: 560),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => _SelectSheet(
+        title: hint ?? '請選擇',
+        labels: [for (final (_, text) in items) text],
+        selected: _selectedIndex,
+      ),
+    );
+    if (picked != null && picked != _selectedIndex) {
+      onChanged(items[picked].$1);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    Widget label(String text) =>
-        Text(text, maxLines: 1, overflow: TextOverflow.ellipsis);
+    final index = _selectedIndex;
+    final text = index < 0 ? null : items[index].$2;
 
-    return ButtonTheme(
-      alignedDropdown: true,
-      child: DropdownButtonFormField<T>(
-        initialValue: value,
-        isExpanded: true,
-        style: Theme.of(context).textTheme.bodyLarge,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
+    return InkWell(
+      onTap: items.isEmpty ? null : () => _openSheet(context),
+      borderRadius: BorderRadius.circular(AppRadius.sm),
+      child: InputDecorator(
+        isEmpty: text == null,
         decoration: InputDecoration(
           fillColor: fillColor,
-          contentPadding: const EdgeInsets.symmetric(vertical: 12),
+          hintText: hint,
+          prefixIcon: icon == null
+              ? null
+              : Icon(icon, size: 18, color: AppColors.mutedForeground),
+          prefixIconConstraints: const BoxConstraints(minWidth: 38),
+          suffixIcon: const Icon(
+            Icons.keyboard_arrow_down,
+            color: AppColors.mutedForeground,
+          ),
+          suffixIconConstraints: const BoxConstraints(minWidth: 40),
         ),
-        hint: hint == null
-            ? null
-            : Text(
-                hint!,
+        child: Text(
+          text ?? '',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.bodyLarge,
+        ),
+      ),
+    );
+  }
+}
+
+/// Option list shown by [AppDropdownField]; pops the tapped index.
+class _SelectSheet extends StatelessWidget {
+  const _SelectSheet({
+    required this.title,
+    required this.labels,
+    required this.selected,
+  });
+
+  final String title;
+  final List<String> labels;
+  final int selected;
+
+  @override
+  Widget build(BuildContext context) {
+    return ConstrainedBox(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.sizeOf(context).height * 0.7,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(height: 10),
+          Container(
+            width: 36,
+            height: 4,
+            decoration: BoxDecoration(
+              color: AppColors.input,
+              borderRadius: BorderRadius.circular(999),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                title,
                 style: const TextStyle(
-                  fontSize: AppText.inputSize,
-                  color: AppColors.mutedForeground,
+                  fontSize: 17,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
-        borderRadius: BorderRadius.circular(AppRadius.sm),
-        dropdownColor: Colors.white,
-        selectedItemBuilder: icon == null
-            ? null
-            : (context) => [
-                for (final (_, text) in items)
-                  Row(
-                    children: [
-                      Icon(icon, size: 18, color: AppColors.mutedForeground),
-                      const SizedBox(width: 8),
-                      Expanded(child: label(text)),
-                    ],
+            ),
+          ),
+          Flexible(
+            child: ListView.builder(
+              shrinkWrap: true,
+              // `useSafeArea` leaves the bottom edge alone, so clear the
+              // home indicator here as well.
+              padding: EdgeInsets.only(
+                bottom: 32 + MediaQuery.paddingOf(context).bottom,
+              ),
+              itemCount: labels.length,
+              itemBuilder: (context, i) {
+                final isSelected = i == selected;
+                return ListTile(
+                  dense: true,
+                  selected: isSelected,
+                  selectedColor: AppColors.primaryDeep,
+                  selectedTileColor: AppColors.primarySoft,
+                  title: Text(
+                    labels[i],
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: isSelected
+                          ? FontWeight.w600
+                          : FontWeight.w400,
+                    ),
                   ),
-              ],
-        items: [
-          for (final (v, text) in items)
-            DropdownMenuItem<T>(value: v, child: label(text)),
+                  trailing: isSelected
+                      ? const Icon(Icons.check, size: 20)
+                      : null,
+                  onTap: () => Navigator.pop(context, i),
+                );
+              },
+            ),
+          ),
         ],
-        onChanged: onChanged,
       ),
     );
   }
@@ -975,6 +1067,57 @@ class FieldLabel extends StatelessWidget {
   }
 }
 
+/// A password [TextField] with an eye button that shows or hides the text.
+class PasswordField extends StatefulWidget {
+  const PasswordField({
+    super.key,
+    required this.controller,
+    this.newPassword = false,
+    this.textInputAction,
+    this.onSubmitted,
+  });
+
+  final TextEditingController controller;
+
+  /// Lets password managers suggest a new password instead of filling one.
+  final bool newPassword;
+  final TextInputAction? textInputAction;
+  final ValueChanged<String>? onSubmitted;
+
+  @override
+  State<PasswordField> createState() => _PasswordFieldState();
+}
+
+class _PasswordFieldState extends State<PasswordField> {
+  bool _visible = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: widget.controller,
+      obscureText: !_visible,
+      textInputAction: widget.textInputAction,
+      autofillHints: [
+        widget.newPassword ? AutofillHints.newPassword : AutofillHints.password,
+      ],
+      onSubmitted: widget.onSubmitted,
+      decoration: InputDecoration(
+        suffixIcon: IconButton(
+          onPressed: () => setState(() => _visible = !_visible),
+          tooltip: _visible ? '隱藏密碼' : '顯示密碼',
+          color: AppColors.mutedForeground,
+          iconSize: 18,
+          icon: Icon(
+            _visible
+                ? Icons.visibility_off_outlined
+                : Icons.visibility_outlined,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// Small "01" chip used to number questions.
 class NumberChip extends StatelessWidget {
   const NumberChip(this.index, {super.key});
@@ -1039,4 +1182,108 @@ void showToast(BuildContext context, String message) {
   ScaffoldMessenger.of(context)
     ..hideCurrentSnackBar()
     ..showSnackBar(SnackBar(content: Text(message)));
+}
+
+/// Runs [action]; if it throws, shows [failure] as a toast. Returns whether
+/// it succeeded.
+Future<bool> runOrToast(
+  BuildContext context,
+  Future<void> Function() action, {
+  String failure = '連線失敗，請稍後再試',
+}) async {
+  try {
+    await action();
+    return true;
+  } catch (e) {
+    debugPrint('$e');
+    if (context.mounted) showToast(context, failure);
+    return false;
+  }
+}
+
+/// The bare white [LogoMark], drawn part by part so the login intro and the
+/// splash screen can animate each piece.
+class AssemblingMark extends CustomPainter {
+  const AssemblingMark({
+    required this.stem,
+    required this.arm1,
+    required this.arm2,
+    required this.shadow,
+    required this.spark1,
+    required this.spark2,
+  });
+
+  final double stem, arm1, arm2, shadow, spark1, spark2;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const bounds = LogoGeometry.bareBounds;
+    canvas.save();
+    canvas.scale(size.width / bounds.width);
+    canvas.translate(-bounds.left, -bounds.top);
+
+    const bars = LogoGeometry.bars;
+    if (shadow > 0) {
+      final paint = Paint()
+        ..color = LogoGeometry.shadow.withValues(alpha: 0.4 * shadow);
+      for (final b in bars) {
+        canvas.drawRRect(b.shift(LogoGeometry.shadowOffset), paint);
+      }
+    }
+
+    // Stem grows up from its bottom edge.
+    if (stem > 0) {
+      final b = bars[0];
+      canvas.save();
+      canvas.translate(0, b.bottom);
+      canvas.scale(1, stem);
+      canvas.translate(0, -b.bottom);
+      _bar(canvas, b, 1);
+      canvas.restore();
+    }
+    // Arms slide in from the right while fading in.
+    for (final (b, t) in [(bars[1], arm1), (bars[2], arm2)]) {
+      if (t <= 0) continue;
+      _bar(canvas, b.shift(Offset(30 * (1 - t), 0)), t.clamp(0, 1));
+    }
+
+    // Sparkles pop in with a quarter turn.
+    for (final ((c, r), t) in [
+      (LogoGeometry.sparkles[0], spark1),
+      (LogoGeometry.sparkles[1], spark2),
+    ]) {
+      if (t <= 0) continue;
+      canvas.save();
+      canvas.translate(c.dx, c.dy);
+      canvas.rotate(-math.pi / 2 * (1 - t));
+      canvas.scale(t);
+      paintSparkle(canvas, Offset.zero, r, Paint()..color = Colors.white);
+      canvas.restore();
+    }
+    canvas.restore();
+  }
+
+  /// A white bar with the logo's light top edge.
+  void _bar(Canvas canvas, RRect b, double opacity) {
+    canvas.drawRRect(
+      b,
+      Paint()..color = Colors.white.withValues(alpha: opacity),
+    );
+    canvas.save();
+    canvas.clipRRect(b);
+    canvas.drawRect(
+      Rect.fromLTWH(b.left, b.top, b.width, 4.5),
+      Paint()..color = LogoGeometry.edge.withValues(alpha: opacity),
+    );
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(AssemblingMark old) =>
+      old.stem != stem ||
+      old.arm1 != arm1 ||
+      old.arm2 != arm2 ||
+      old.shadow != shadow ||
+      old.spark1 != spark1 ||
+      old.spark2 != spark2;
 }

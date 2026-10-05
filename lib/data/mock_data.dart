@@ -2,23 +2,34 @@ import 'models.dart';
 
 class MockData {
   static const members = [
-    Member('林郁婷', '產品設計'),
-    Member('陳柏安', '工程部'),
-    Member('吳思妤', '客戶成功'),
-    Member('黃子軒', '行銷企劃'),
-    Member('張雅雯', '財務行政'),
-    Member('蔡承翰', '工程部'),
-    Member('李冠廷', '業務開發'),
-    Member('周品妍', '人資'),
-    Member('許家豪', '工程部'),
-    Member('鄭宇翔', '工程部'),
-    Member('高詩涵', '產品設計'),
-    Member('楊凱文', '客戶成功'),
-    Member('謝佳穎', '行銷企劃'),
-    Member('林志明', '業務開發'),
-    Member('張雅婷', '業務開發'),
-    Member('周美玲', '財務行政'),
-    Member('王思涵', '人資'),
+    Member('m1', '林郁婷', '產品設計'),
+    Member('m2', '陳柏安', '工程部'),
+    Member('m3', '吳思妤', '客戶成功'),
+    Member('m4', '黃子軒', '行銷企劃'),
+    Member('m5', '張雅雯', '財務行政'),
+    Member('m6', '蔡承翰', '工程部'),
+    Member('m7', '李冠廷', '業務開發'),
+    Member('m8', '周品妍', '人資'),
+    Member('m9', '許家豪', '工程部'),
+    Member('m10', '鄭宇翔', '工程部'),
+    Member('m11', '高詩涵', '產品設計'),
+    Member('m12', '楊凱文', '客戶成功'),
+    Member('m13', '謝佳穎', '行銷企劃'),
+    Member('m14', '林志明', '業務開發'),
+    Member('m15', '張雅婷', '業務開發'),
+    Member('m16', '周美玲', '財務行政'),
+    Member('m17', '王思涵', '人資'),
+  ];
+
+  static const departments = [
+    '營運管理',
+    '產品設計',
+    '工程部',
+    '客戶成功',
+    '行銷企劃',
+    '業務開發',
+    '財務行政',
+    '人資',
   ];
 
   static List<FormItem> forms() {

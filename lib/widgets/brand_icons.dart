@@ -19,6 +19,7 @@ enum BrandGlyph {
   calendar,
   verified,
   swap,
+  lock,
   logout;
 
   /// Whether the glyph has its own outline and banner-edge drawings.
@@ -244,6 +245,23 @@ class _BrandIconPainter extends CustomPainter {
         _drawRounded(canvas, _triangle(15, 3.2, 20, 7.2, 15, 11.2), c);
         canvas.drawRRect(_rr(7, 15.1, 14, 3.4, 1.7), p);
         _drawRounded(canvas, _triangle(9, 12.8, 4, 16.8, 9, 20.8), c);
+      case BrandGlyph.lock:
+        canvas.drawPath(
+          Path()
+            ..moveTo(7.5, 11)
+            ..lineTo(7.5, 7.5)
+            ..arcTo(
+              Rect.fromCircle(center: const Offset(12, 7.5), radius: 4.5),
+              math.pi,
+              math.pi,
+              false,
+            )
+            ..lineTo(16.5, 11),
+          _strokePaint(c, 2.6),
+        );
+        canvas.drawRRect(_rr(4, 10, 16, 12, 3.5), p);
+        canvas.drawCircle(const Offset(12, 15), 1.9, _clear);
+        canvas.drawRRect(_rr(11.1, 15, 1.8, 3.8, 0.9), _clear);
       case BrandGlyph.logout:
         canvas.drawRRect(_rr(3, 3, 10, 18, 3), p);
         final bar = _rr(9, 10.3, 9, 3.4, 1.7);

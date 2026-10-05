@@ -1,0 +1,10 @@
+<!--
+  Supabase Dashboard → Authentication → Emails → Reset Password
+  Subject: FormFlow 重設密碼驗證碼
+  Paste this as the message body. The app's 重設密碼 page asks for
+  {{ .Token }}; there is no link to click.
+-->
+<h2>重設你的 FormFlow 密碼</h2>
+<p>我們收到了 {{ .Email }} 重設密碼的請求。請在 App 的「重設密碼」頁輸入以下驗證碼：</p>
+<p style="font-size: 28px; font-weight: 700; letter-spacing: 6px;">{{ .Token }}</p>
+<p>驗證碼一小時內有效。如果不是你本人操作，可以忽略這封信，你的密碼不會改變。</p>
