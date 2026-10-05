@@ -43,6 +43,15 @@ class SupabaseFormRepository implements FormRepository {
   }
 
   @override
+  Future<List<String>> fetchDepartments() async {
+    final res = await _dio.get<List<dynamic>>(
+      '/rest/v1/departments',
+      queryParameters: {'select': 'name', 'order': 'sort_order,name'},
+    );
+    return [for (final r in res.data!) (r as Map)['name'] as String];
+  }
+
+  @override
   Future<List<FormItem>> fetchForms() async {
     final res = await _dio.get<List<dynamic>>(
       '/rest/v1/forms',
@@ -107,7 +116,8 @@ class SupabaseFormRepository implements FormRepository {
 Member _memberFrom(Map<String, dynamic> row) => Member(
   row['id'] as String,
   row['display_name'] as String,
-  row['department'] as String,
+  // Null means no department.
+  row['department'] as String? ?? '',
 );
 
 FormItem _formFrom(Map<String, dynamic> row) => FormItem(

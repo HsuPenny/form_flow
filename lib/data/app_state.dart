@@ -23,8 +23,10 @@ class AppState extends ChangeNotifier {
   UserProfile? _profile;
   List<Member> _members = [];
   List<FormItem> _forms = [];
+  List<String> _departments = [];
 
   List<Member> get members => UnmodifiableListView(_members);
+  List<String> get departments => UnmodifiableListView(_departments);
   List<FormItem> get forms => UnmodifiableListView(_forms);
 
   /// Kept after logout so the shell can still render while it animates out.
@@ -75,17 +77,46 @@ class AppState extends ChangeNotifier {
     ),
   );
 
+  Future<void> sendPasswordReset({required String email}) =>
+      _auth.sendPasswordReset(email: email);
+
+  Future<void> resetPassword({
+    required String email,
+    required String code,
+    required String newPassword,
+  }) async => _enter(
+    await _auth.resetPassword(
+      email: email,
+      code: code,
+      newPassword: newPassword,
+    ),
+  );
+
   Future<void> _enter(UserProfile profile) async {
     _profile = profile;
-    final (members, forms) = await (
+    final (members, forms, departments) = await (
       _formRepo.fetchMembers(),
       _formRepo.fetchForms(),
+      // Only the settings dropdown needs these; don't block sign-in on them.
+      _formRepo.fetchDepartments().catchError((Object e) {
+        debugPrint('Could not load departments: $e');
+        return <String>[];
+      }),
     ).wait;
     _members = members;
     _forms = forms;
+    _departments = departments;
     _signedIn = true;
     notifyListeners();
   }
+
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) => _auth.changePassword(
+    currentPassword: currentPassword,
+    newPassword: newPassword,
+  );
 
   Future<void> logout() async {
     await _auth.signOut();

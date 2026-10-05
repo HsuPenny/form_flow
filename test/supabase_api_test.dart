@@ -57,6 +57,28 @@ class FakeSupabase implements HttpClientAdapter {
         refreshCalls++;
         await Future<void>.delayed(const Duration(milliseconds: 10));
         return _json(_session());
+      case ('POST', '/auth/v1/recover'):
+        return body!['email'] == 'bad'
+            ? _json({
+                'error_code': 'validation_failed',
+                'msg': 'Unable to validate email address',
+              }, 400)
+            : _json({});
+      case ('POST', '/auth/v1/verify') when body!['type'] == 'recovery':
+        return body['token'] == '123456'
+            ? _json(_session())
+            : _json({
+                'error_code': 'otp_expired',
+                'msg': 'Token has expired or is invalid',
+              }, 403);
+      case ('PUT', '/auth/v1/user'):
+        if (auth == null) return _json({'msg': 'no session'}, 401);
+        return body!['password'] == 'old-password'
+            ? _json({
+                'error_code': 'same_password',
+                'msg': 'New password should be different',
+              }, 422)
+            : _json({'id': userId, 'email': 'lisa@example.com'});
       case ('POST', '/auth/v1/logout'):
         return logoutFails
             ? _json({'msg': 'down'}, 500)
@@ -71,6 +93,11 @@ class FakeSupabase implements HttpClientAdapter {
     return switch ((options.method, options.path)) {
       ('GET', '/rest/v1/profiles') when single => _json(_profile),
       ('GET', '/rest/v1/profiles') => _json([_profile]),
+      ('PATCH', '/rest/v1/profiles') => _json({..._profile, ...?body}),
+      ('GET', '/rest/v1/departments') => _json([
+        {'name': '營運管理'},
+        {'name': '工程部'},
+      ]),
       ('GET', '/rest/v1/forms') when single => _json(_form),
       ('GET', '/rest/v1/forms') => _json([_form]),
       ('POST', '/rest/v1/rpc/save_form') => ResponseBody.fromString('', 204),
@@ -201,6 +228,104 @@ void main() {
     expect(results, everyElement(hasLength(1)));
     expect(server.refreshCalls, 1);
     expect(server.requests.last.headers['Authorization'], 'Bearer access2');
+  });
+
+  test('password reset posts the email to /recover', () async {
+    await auth.sendPasswordReset(email: 'lisa@example.com');
+    final req = server.requests.last;
+    expect(req.path, '/auth/v1/recover');
+    expect(req.data, {'email': 'lisa@example.com'});
+
+    await expectLater(
+      auth.sendPasswordReset(email: 'bad'),
+      throwsA(
+        isA<AuthFailure>().having((e) => e.message, 'message', '信箱格式不正確'),
+      ),
+    );
+  });
+
+  test('reset password verifies the code, then sets the password', () async {
+    final profile = await auth.resetPassword(
+      email: 'lisa@example.com',
+      code: '123456',
+      newPassword: 'new-secret',
+    );
+    expect(profile.displayName, '王莉莎');
+    final put = server.requests.firstWhere((r) => r.path == '/auth/v1/user');
+    expect(put.method, 'PUT');
+    expect(put.data, {'password': 'new-secret'});
+    expect(put.headers['Authorization'], 'Bearer access1');
+  });
+
+  test('a wrong reset code becomes a readable AuthFailure', () async {
+    await expectLater(
+      auth.resetPassword(
+        email: 'lisa@example.com',
+        code: '000000',
+        newPassword: 'new-secret',
+      ),
+      throwsA(
+        isA<AuthFailure>().having(
+          (e) => e.message,
+          'message',
+          '驗證碼錯誤或已過期，請重新寄送',
+        ),
+      ),
+    );
+    expect(api.sessions.current, isNull);
+  });
+
+  test('a rejected new password leaves the user signed out', () async {
+    await expectLater(
+      auth.resetPassword(
+        email: 'lisa@example.com',
+        code: '123456',
+        newPassword: 'old-password',
+      ),
+      throwsA(isA<AuthFailure>()),
+    );
+    expect(api.sessions.current, isNull);
+  });
+
+  test('change password checks the current one first', () async {
+    await auth.signIn(email: 'lisa@example.com', password: 'secret');
+    await expectLater(
+      auth.changePassword(currentPassword: 'nope', newPassword: 'new-secret'),
+      throwsA(
+        isA<AuthFailure>().having((e) => e.message, 'message', '目前的密碼不正確'),
+      ),
+    );
+    expect(server.requests.where((r) => r.path == '/auth/v1/user'), isEmpty);
+    // Still signed in with the original session.
+    expect(api.sessions.current?.accessToken, 'access1');
+
+    await auth.changePassword(
+      currentPassword: 'secret',
+      newPassword: 'new-secret',
+    );
+    final put = server.requests.last;
+    expect((put.method, put.path), ('PUT', '/auth/v1/user'));
+    expect(put.data, {'password': 'new-secret'});
+    expect(put.headers['Authorization'], 'Bearer access2');
+  });
+
+  test('departments come back in order', () async {
+    await auth.signIn(email: 'lisa@example.com', password: 'secret');
+    expect(await forms.fetchDepartments(), ['營運管理', '工程部']);
+    expect(server.requests.last.queryParameters['order'], 'sort_order,name');
+  });
+
+  test('an empty department is saved as null', () async {
+    final profile = await auth.signIn(
+      email: 'lisa@example.com',
+      password: 'secret',
+    );
+    await expectLater(
+      auth.updateProfile(profile.copyWith(department: '')),
+      completes,
+    );
+    final patch = server.requests.last;
+    expect((patch.data as Map)['department'], isNull);
   });
 
   test('sign out clears the session even if the server call fails', () async {

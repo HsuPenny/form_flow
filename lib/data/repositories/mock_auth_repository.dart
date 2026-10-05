@@ -40,6 +40,22 @@ class MockAuthRepository implements AuthRepository {
   }
 
   @override
+  Future<void> sendPasswordReset({required String email}) async {}
+
+  @override
+  Future<UserProfile> resetPassword({
+    required String email,
+    required String code,
+    required String newPassword,
+  }) => signIn(email: email, password: newPassword);
+
+  @override
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {}
+
+  @override
   Future<void> signOut() async => _signedIn = false;
 
   @override

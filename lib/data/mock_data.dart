@@ -21,6 +21,17 @@ class MockData {
     Member('m17', '王思涵', '人資'),
   ];
 
+  static const departments = [
+    '營運管理',
+    '產品設計',
+    '工程部',
+    '客戶成功',
+    '行銷企劃',
+    '業務開發',
+    '財務行政',
+    '人資',
+  ];
+
   static List<FormItem> forms() {
     final workshopQuestions = [
       Question(

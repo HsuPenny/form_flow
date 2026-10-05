@@ -10,6 +10,9 @@ class MockFormRepository implements FormRepository {
   Future<List<Member>> fetchMembers() async => [...MockData.members];
 
   @override
+  Future<List<String>> fetchDepartments() async => [...MockData.departments];
+
+  @override
   Future<List<FormItem>> fetchForms() async => [..._forms];
 
   @override

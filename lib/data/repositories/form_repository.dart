@@ -4,6 +4,9 @@ import '../models.dart';
 abstract interface class FormRepository {
   Future<List<Member>> fetchMembers();
 
+  /// Department names a profile can be assigned to, in display order.
+  Future<List<String>> fetchDepartments();
+
   /// All forms visible to the signed-in user, newest first.
   Future<List<FormItem>> fetchForms();
 
