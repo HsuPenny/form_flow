@@ -52,7 +52,10 @@ extension QuestionTypeInfo on QuestionType {
       this == QuestionType.dropdown;
 }
 
-enum FormStatus { draft, pending, completed }
+/// pending → completed follows the replies (every recipient has answered).
+/// closed is set by an admin (結案) and is final: no more replies, no
+/// deadline extensions, no new recipients.
+enum FormStatus { draft, pending, completed, closed }
 
 class Member {
   const Member(this.id, this.name, this.department);
@@ -188,13 +191,32 @@ class FormItem {
   int get percent => (progress * 100).round();
   int get estimatedMinutes => (questions.length * 1.2).ceil().clamp(1, 60);
 
+  bool get isPublished =>
+      status == FormStatus.pending || status == FormStatus.completed;
+
+  bool get isPastDeadline {
+    final now = DateTime.now();
+    return DateTime(now.year, now.month, now.day).isAfter(deadline);
+  }
+
+  /// Replies are accepted, and recipients can be added, through the end of
+  /// the deadline day, unless the form has been closed (結案).
+  bool get isOpen => isPublished && !isPastDeadline;
+
+  /// Forms not everyone has answered can get a later deadline, even after
+  /// the old one has passed. Closed forms can't.
+  bool get canExtendDeadline => status == FormStatus.pending;
+
   bool hasResponded(Member m) => responses.any((r) => r.member == m);
 
   /// [status] as [m] sees it: a published form is done for them once they
-  /// have responded, whatever the other recipients have done.
+  /// have responded, whatever the other recipients have done. A closed form
+  /// they never answered stays closed.
   FormStatus statusFor(Member m) => switch (status) {
     FormStatus.draft => FormStatus.draft,
-    _ => hasResponded(m) ? FormStatus.completed : FormStatus.pending,
+    _ when hasResponded(m) => FormStatus.completed,
+    FormStatus.closed => FormStatus.closed,
+    _ => FormStatus.pending,
   };
 
   FormResponse? responseOf(Member m) {

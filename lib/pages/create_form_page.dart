@@ -25,7 +25,13 @@ class _CreateFormPageState extends State<CreateFormPage> {
   // Step 1
   late final _title = TextEditingController(text: widget.draft?.title);
   late final _desc = TextEditingController(text: widget.draft?.description);
-  late DateTime _deadline = widget.draft?.deadline ?? DateTime(2026, 10, 20);
+  late DateTime _deadline = widget.draft?.deadline ?? _today().add(_defaultTerm);
+  static const _defaultTerm = Duration(days: 7);
+
+  static DateTime _today() {
+    final now = DateTime.now();
+    return DateTime(now.year, now.month, now.day);
+  }
   late List<Member> _recipients = widget.draft != null
       ? [...widget.draft!.recipients]
       : AppScope.of(context).members.take(3).toList();
@@ -107,6 +113,19 @@ class _CreateFormPageState extends State<CreateFormPage> {
     if (!saved || !mounted) return;
     showToast(context, publish ? '表單已發佈' : (draft == null ? '已儲存草稿' : '已更新草稿'));
     ShellNav.of(context).closeSubPage();
+  }
+
+  /// An old draft can carry a deadline that has already passed, which would
+  /// publish the form closed; send the admin back to step 1 to change it.
+  bool get _deadlinePassed => _deadline.isBefore(_today());
+
+  void _publish() {
+    if (_deadlinePassed) {
+      setState(() => _step = 0);
+      showToast(context, '截止日已經過了，請改成今天或之後再發佈');
+      return;
+    }
+    _finish(publish: true);
   }
 
   /// Saves what's there so far; only a title is required for a draft.
@@ -215,7 +234,7 @@ class _CreateFormPageState extends State<CreateFormPage> {
         FilledButton.icon(
           onPressed: _finalRecipients.isEmpty
               ? null
-              : () => _finish(publish: true),
+              : _publish,
           icon: const Icon(Icons.send_outlined, size: 16),
           label: const Text('立即發佈'),
         ),
@@ -263,11 +282,14 @@ class _CreateFormPageState extends State<CreateFormPage> {
       text: formatDate(_deadline),
       icon: Icons.calendar_today_outlined,
       onTap: () async {
+        final today = _today();
         final picked = await showDatePicker(
           context: context,
           initialDate: _deadline,
-          firstDate: DateTime(2026),
-          lastDate: DateTime(2030),
+          // Past days would close the form right away; an old draft's
+          // deadline stays pickable so the picker can open on it.
+          firstDate: _deadline.isBefore(today) ? _deadline : today,
+          lastDate: DateTime(today.year + 3, 12, 31),
         );
         if (picked != null) setState(() => _deadline = picked);
       },
@@ -304,6 +326,10 @@ class _CreateFormPageState extends State<CreateFormPage> {
             width: wide ? 240 : double.infinity,
             child: _labeled('回覆截止日', deadlineField),
           ),
+          if (_deadlinePassed) ...[
+            const SizedBox(height: 6),
+            const FieldError('截止日已經過了，發佈前請改成今天或之後'),
+          ],
           const SizedBox(height: 16),
           RecipientField(
             allMembers: AppScope.of(context).members,

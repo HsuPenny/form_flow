@@ -72,7 +72,7 @@ class _FillFormPageState extends State<FillFormPage> {
   @override
   Widget build(BuildContext context) {
     if (_submitted) return _Done(form: widget.form, updated: _previous != null);
-    if (!_editing) return _responseView(_previous!);
+    if (!_editing || !widget.form.isOpen) return _responseView(_previous);
 
     final form = widget.form;
     final total = form.questions.length;
@@ -138,9 +138,14 @@ class _FillFormPageState extends State<FillFormPage> {
     _editing = false;
   });
 
-  /// The response the viewer already sent, with 修改回覆 to change it.
-  Widget _responseView(FormResponse response) {
+  /// The response the viewer already sent (null if they never replied),
+  /// with 修改回覆 while the form is still open.
+  Widget _responseView(FormResponse? response) {
     final form = widget.form;
+    final closed = form.status == FormStatus.closed;
+    final dueOn = formatDate(form.deadline).substring(5).replaceAll('-', '/');
+    // Why the form no longer takes replies: 結案 or a passed deadline.
+    final reason = closed ? '這份表單已結案' : '已於 $dueOn 截止';
     return Column(
       children: [
         Expanded(
@@ -151,7 +156,9 @@ class _FillFormPageState extends State<FillFormPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 PageHeader(
-                  eyebrow: '已於 ${formatDateTime(response.submittedAt)} 送出',
+                  eyebrow: response == null
+                      ? (closed ? '已結案' : '$dueOn 已截止')
+                      : '已於 ${formatDateTime(response.submittedAt)} 送出',
                   title: form.title,
                   icon: BrandGlyph.fill,
                   leading: HeaderAction(
@@ -170,23 +177,50 @@ class _FillFormPageState extends State<FillFormPage> {
                   deadline: form.deadline,
                 ),
                 const SizedBox(height: 20),
-                AnswerList(
-                  questions: form.questions,
-                  answers: response.answers,
-                ),
+                if (response == null)
+                  AppCard(
+                    padding: const EdgeInsets.symmetric(vertical: 40),
+                    child: Center(
+                      child: Text(
+                        closed ? '你沒有在結案前回覆這份表單' : '你沒有在截止前回覆這份表單',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: AppColors.mutedForeground,
+                        ),
+                      ),
+                    ),
+                  )
+                else
+                  AnswerList(
+                    questions: form.questions,
+                    answers: response.answers,
+                  ),
               ],
             ),
           ),
         ),
         _ActionBar(
-          child: SizedBox(
-            width: double.infinity,
-            child: FilledButton.icon(
-              onPressed: () => setState(() => _editing = true),
-              icon: const Icon(Icons.edit_outlined, size: 16),
-              label: const Text('修改回覆'),
-            ),
-          ),
+          child: form.isOpen
+              ? SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: () => setState(() => _editing = true),
+                    icon: const Icon(Icons.edit_outlined, size: 16),
+                    label: const Text('修改回覆'),
+                  ),
+                )
+              : Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  child: Text(
+                    '$reason，無法再${response == null ? '填寫' : '修改'}',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.mutedForeground,
+                    ),
+                  ),
+                ),
         ),
       ],
     );
@@ -310,6 +344,7 @@ class _Done extends StatelessWidget {
               (f) =>
                   f != form &&
                   f.recipients.contains(me) &&
+                  f.isOpen &&
                   f.statusFor(me) == FormStatus.pending,
             )
             .toList()

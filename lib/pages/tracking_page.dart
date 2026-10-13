@@ -5,6 +5,7 @@ import '../data/models.dart';
 import '../theme/app_theme.dart';
 import '../widgets/common.dart';
 import '../widgets/form_renderer.dart';
+import '../widgets/recipient_picker.dart';
 import 'shell.dart';
 
 class TrackingPage extends StatefulWidget {
@@ -224,6 +225,17 @@ class _ProgressRing extends StatelessWidget {
   }
 }
 
+/// 已結案, or 已截止 while people still haven't replied; null otherwise.
+StatusBadge? _closedBadge(FormItem form) {
+  if (form.status == FormStatus.closed) {
+    return StatusBadge.forStatus(FormStatus.closed);
+  }
+  if (form.status == FormStatus.pending && form.isPastDeadline) {
+    return const StatusBadge('已截止', tone: BadgeTone.destructive);
+  }
+  return null;
+}
+
 class _ProgressCard extends StatelessWidget {
   const _ProgressCard({
     required this.form,
@@ -270,6 +282,10 @@ class _ProgressCard extends StatelessWidget {
                 ],
               ),
             ),
+            if (_closedBadge(form) case final badge?) ...[
+              badge,
+              const SizedBox(width: 6),
+            ],
             Icon(
               expanded ? Icons.expand_less : Icons.expand_more,
               size: 20,
@@ -377,18 +393,137 @@ class _RecipientList extends StatefulWidget {
 class _RecipientListState extends State<_RecipientList> {
   late bool _waiting = widget.form.respondedCount < widget.form.totalCount;
 
+  /// Picks people who aren't recipients yet and adds them to the form.
+  Future<void> _addRecipients() async {
+    final app = AppScope.of(context);
+    final form = widget.form;
+    final picked = await showRecipientPicker(
+      context,
+      allMembers: [
+        for (final m in app.members)
+          if (!form.recipients.contains(m)) m,
+      ],
+    );
+    if (picked == null || picked.isEmpty || !mounted) return;
+    final added = await runOrToast(
+      context,
+      () => app.addRecipients(form, picked),
+      failure: '新增失敗，請稍後再試',
+    );
+    if (!added || !mounted) return;
+    setState(() => _waiting = true);
+    showToast(context, '已新增 ${picked.length} 位填寫人員');
+  }
+
+  /// Picks a later deadline; reopens the form if the old one had passed.
+  Future<void> _extendDeadline() async {
+    final app = AppScope.of(context);
+    final form = widget.form;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final dayAfter = form.deadline.add(const Duration(days: 1));
+    final earliest = dayAfter.isAfter(today) ? dayAfter : today;
+    final picked = await showDatePicker(
+      context: context,
+      helpText: '延長截止日',
+      initialDate: earliest,
+      firstDate: earliest,
+      lastDate: DateTime(earliest.year + 3, 12, 31),
+    );
+    if (picked == null || !mounted) return;
+    final saved = await runOrToast(
+      context,
+      () => app.extendDeadline(form, picked),
+      failure: '延長失敗，請稍後再試',
+    );
+    if (saved && mounted) {
+      showToast(context, '截止日已延到 ${formatDate(picked)}');
+    }
+  }
+
+  /// 結案 after confirming; it can't be undone.
+  Future<void> _close() async {
+    final form = widget.form;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.white,
+        title: const Text('結案這份表單？', style: TextStyle(fontSize: 18)),
+        content: Text(
+          '「${form.title}」結案後就不能再填寫或修改回覆，'
+          '也無法延長截止日或新增填寫人員。這個動作無法復原。',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('結案'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    final app = AppScope.of(context);
+    final closed = await runOrToast(
+      context,
+      () => app.closeForm(form),
+      failure: '結案失敗，請稍後再試',
+    );
+    if (closed && mounted) showToast(context, '已結案');
+  }
+
+  /// What an admin can still do with this form: add people until the
+  /// deadline, extend it while replies are missing, close it once published.
+  Widget? _actions() {
+    final form = widget.form;
+    final app = AppScope.of(context);
+    Widget action(IconData icon, String label, VoidCallback onPressed) =>
+        TextButton.icon(
+          onPressed: onPressed,
+          style: TextButton.styleFrom(
+            visualDensity: VisualDensity.compact,
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ),
+          icon: Icon(icon, size: 16),
+          label: Text(label, style: const TextStyle(fontSize: 12)),
+        );
+    final actions = [
+      if (form.isOpen && !app.members.every(form.recipients.contains))
+        action(Icons.person_add_alt, '新增填寫人員', _addRecipients),
+      if (form.canExtendDeadline)
+        action(Icons.event_outlined, '延長截止日', _extendDeadline),
+      if (form.isPublished)
+        action(Icons.lock_outline, '結案', _close),
+    ];
+    if (actions.isEmpty) return null;
+    return Wrap(spacing: 4, runSpacing: 4, children: actions);
+  }
+
   @override
   Widget build(BuildContext context) {
     final form = widget.form;
+    final actions = _actions();
     if (form.recipients.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(vertical: 20),
-        child: Center(
-          child: Text(
-            '這份表單尚未指派收件人',
-            style: TextStyle(fontSize: 12, color: AppColors.mutedForeground),
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ?actions,
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 20),
+            child: Center(
+              child: Text(
+                '這份表單尚未指派收件人',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: AppColors.mutedForeground,
+                ),
+              ),
+            ),
           ),
-        ),
+        ],
       );
     }
 
@@ -436,6 +571,10 @@ class _RecipientListState extends State<_RecipientList> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (actions != null) ...[
+          actions,
+          const Divider(height: 16, color: AppColors.muted),
+        ],
         Row(
           children: [
             toggle(

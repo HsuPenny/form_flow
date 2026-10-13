@@ -28,6 +28,37 @@ class MockFormRepository implements FormRepository {
   }
 
   @override
+  Future<FormItem> addRecipients(String formId, List<Member> members) async {
+    final form = _forms.firstWhere((f) => f.id == formId);
+    if (!form.isOpen) throw StateError('Form $formId is not open');
+    form.recipients.addAll(members.where((m) => !form.recipients.contains(m)));
+    if (form.respondedCount < form.totalCount) {
+      form.status = FormStatus.pending;
+    }
+    return form;
+  }
+
+  @override
+  Future<FormItem> extendDeadline(String formId, DateTime deadline) async {
+    final form = _forms.firstWhere((f) => f.id == formId);
+    final now = DateTime.now();
+    if (!form.canExtendDeadline ||
+        deadline.isBefore(DateTime(now.year, now.month, now.day))) {
+      throw StateError('Cannot move form $formId to $deadline');
+    }
+    form.deadline = deadline;
+    return form;
+  }
+
+  @override
+  Future<FormItem> closeForm(String formId) async {
+    final form = _forms.firstWhere((f) => f.id == formId);
+    if (!form.isPublished) throw StateError('Form $formId is not published');
+    form.status = FormStatus.closed;
+    return form;
+  }
+
+  @override
   Future<FormItem> submitResponse(String formId, FormResponse response) async {
     final form = _forms.firstWhere((f) => f.id == formId);
     final me = response.member;
@@ -37,7 +68,8 @@ class MockFormRepository implements FormRepository {
     if (!form.recipients.contains(me)) {
       form.recipients.add(me);
     }
-    if (form.respondedCount >= form.totalCount) {
+    if (form.status == FormStatus.pending &&
+        form.respondedCount >= form.totalCount) {
       form.status = FormStatus.completed;
     }
     return form;

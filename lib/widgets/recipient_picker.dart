@@ -31,23 +31,12 @@ class RecipientField extends StatelessWidget {
   final void Function(bool wholeCompany, List<Member> selected) onChanged;
 
   Future<void> _openSheet(BuildContext context) async {
-    final result = await showModalBottomSheet<Set<String>>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Colors.white,
-      constraints: const BoxConstraints(maxWidth: 560),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (_) => RecipientPickerSheet(
-        allMembers: allMembers,
-        initial: {for (final m in selected) m.id},
-      ),
+    final result = await showRecipientPicker(
+      context,
+      allMembers: allMembers,
+      initial: selected,
     );
-    if (result != null) {
-      onChanged(false, allMembers.where((m) => result.contains(m.id)).toList());
-    }
+    if (result != null) onChanged(false, result);
   }
 
   @override
@@ -185,6 +174,31 @@ class _Chip extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Opens [RecipientPickerSheet] over [allMembers] with [initial] ticked.
+/// Returns the chosen members, or null if the sheet was dismissed.
+Future<List<Member>?> showRecipientPicker(
+  BuildContext context, {
+  required List<Member> allMembers,
+  List<Member> initial = const [],
+}) async {
+  final result = await showModalBottomSheet<Set<String>>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    backgroundColor: Colors.white,
+    constraints: const BoxConstraints(maxWidth: 560),
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    ),
+    builder: (_) => RecipientPickerSheet(
+      allMembers: allMembers,
+      initial: {for (final m in initial) m.id},
+    ),
+  );
+  if (result == null) return null;
+  return allMembers.where((m) => result.contains(m.id)).toList();
 }
 
 /// Bottom sheet: departments with tri-state checkboxes that expand to show

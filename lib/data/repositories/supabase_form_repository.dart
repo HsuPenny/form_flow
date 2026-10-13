@@ -86,6 +86,36 @@ class SupabaseFormRepository implements FormRepository {
   );
 
   @override
+  Future<FormItem> addRecipients(String formId, List<Member> members) async {
+    await _dio.post<void>(
+      '/rest/v1/rpc/add_recipients',
+      data: {
+        'form_id': formId,
+        'member_ids': [for (final m in members) m.id],
+      },
+    );
+    return _fetchForm(formId);
+  }
+
+  @override
+  Future<FormItem> extendDeadline(String formId, DateTime deadline) async {
+    await _dio.post<void>(
+      '/rest/v1/rpc/extend_deadline',
+      data: {'form_id': formId, 'new_deadline': formatDate(deadline)},
+    );
+    return _fetchForm(formId);
+  }
+
+  @override
+  Future<FormItem> closeForm(String formId) async {
+    await _dio.post<void>(
+      '/rest/v1/rpc/close_form',
+      data: {'form_id': formId},
+    );
+    return _fetchForm(formId);
+  }
+
+  @override
   Future<FormItem> submitResponse(String formId, FormResponse response) async {
     await _dio.post<void>(
       '/rest/v1/responses',

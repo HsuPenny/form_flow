@@ -835,7 +835,7 @@ class StatusBadge extends StatelessWidget {
   const StatusBadge(this.label, {super.key, this.tone = BadgeTone.primary});
 
   factory StatusBadge.forStatus(FormStatus status, {bool tracking = false}) {
-    // One color per status: 草稿 gray, 待完成 blue, 已完成 green.
+    // 草稿 and 已結案 gray (nothing left to do), 待完成 blue, 已完成 green.
     return switch (status) {
       FormStatus.draft => const StatusBadge('草稿', tone: BadgeTone.muted),
       FormStatus.pending => StatusBadge(
@@ -843,6 +843,7 @@ class StatusBadge extends StatelessWidget {
         tone: BadgeTone.accent,
       ),
       FormStatus.completed => const StatusBadge('已完成', tone: BadgeTone.success),
+      FormStatus.closed => const StatusBadge('已結案', tone: BadgeTone.muted),
     };
   }
 
@@ -901,27 +902,6 @@ class Avatar extends StatelessWidget {
         ),
       ),
     );
-  }
-}
-
-class ProgressLine extends StatelessWidget {
-  const ProgressLine(this.value, {super.key, this.width});
-
-  final double value;
-  final double? width;
-
-  @override
-  Widget build(BuildContext context) {
-    final bar = ClipRRect(
-      borderRadius: BorderRadius.circular(999),
-      child: LinearProgressIndicator(
-        value: value,
-        minHeight: 5,
-        backgroundColor: AppColors.muted,
-        color: AppColors.primaryDark,
-      ),
-    );
-    return width == null ? bar : SizedBox(width: width, child: bar);
   }
 }
 
