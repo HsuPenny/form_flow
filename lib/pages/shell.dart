@@ -113,14 +113,7 @@ class AppShellState extends State<AppShell> {
         },
         child: Scaffold(
           extendBody: true,
-          body: Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topRight,
-                end: Alignment.bottomLeft,
-                colors: [AppColors.shellTint, AppColors.background],
-              ),
-            ),
+          body: _FluidBackground(
             child: SafeArea(
               bottom: false,
               child: wide
@@ -159,6 +152,55 @@ class AppShellState extends State<AppShell> {
                   onSelect: goTo,
                 ),
         ),
+      ),
+    );
+  }
+}
+
+/// The page background: soft peach, apricot and rose blobs on
+/// [AppColors.background], sized from the screen's short side so they look
+/// the same on phones and wide windows.
+class _FluidBackground extends StatelessWidget {
+  const _FluidBackground({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final d = MediaQuery.sizeOf(context).shortestSide;
+
+    Widget blob(Color color, double size) => IgnorePointer(
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: RadialGradient(colors: [color, color.withValues(alpha: 0)]),
+        ),
+      ),
+    );
+
+    return ColoredBox(
+      color: AppColors.background,
+      child: Stack(
+        children: [
+          Positioned(
+            top: -d * 0.45,
+            right: -d * 0.45,
+            child: blob(const Color(0xCCFFC9A3), d * 1.3),
+          ),
+          Positioned(
+            top: d * 0.55,
+            left: -d * 0.6,
+            child: blob(const Color(0xFFFFE0C2), d * 1.1),
+          ),
+          Positioned(
+            bottom: -d * 0.4,
+            right: -d * 0.35,
+            child: blob(const Color(0xCCFFD6D0), d * 1.1),
+          ),
+          Positioned.fill(child: child),
+        ],
       ),
     );
   }

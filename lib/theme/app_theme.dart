@@ -35,7 +35,6 @@ class AppColors {
   static const border = Color(0xFFEADFD9);
   static const input = Color(0xFFD6C8C0);
   static const sidebar = Color(0xFFFFFBF8);
-  static const shellTint = Color(0xFFFFF1E8);
 }
 
 class AppGradients {
