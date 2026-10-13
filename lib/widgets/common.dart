@@ -834,9 +834,9 @@ enum BadgeTone { primary, success, accent, muted, destructive }
 class StatusBadge extends StatelessWidget {
   const StatusBadge(this.label, {super.key, this.tone = BadgeTone.primary});
 
-  factory StatusBadge.forForm(FormItem form, {bool tracking = false}) {
+  factory StatusBadge.forStatus(FormStatus status, {bool tracking = false}) {
     // One color per status: 草稿 gray, 待完成 blue, 已完成 green.
-    return switch (form.status) {
+    return switch (status) {
       FormStatus.draft => const StatusBadge('草稿', tone: BadgeTone.muted),
       FormStatus.pending => StatusBadge(
         tracking ? '進行中' : '待完成',
