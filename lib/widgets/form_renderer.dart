@@ -159,6 +159,61 @@ class QuestionList extends StatelessWidget {
   }
 }
 
+/// Read-only question / answer cards for a submitted response.
+class AnswerList extends StatelessWidget {
+  const AnswerList({super.key, required this.questions, required this.answers});
+
+  final List<Question> questions;
+  final Answers answers;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        for (var i = 0; i < questions.length; i++)
+          Container(
+            width: double.infinity,
+            margin: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.card,
+              borderRadius: BorderRadius.circular(AppRadius.sm),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    NumberChip(i),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        questions[i].title,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Padding(
+                  padding: const EdgeInsets.only(left: 36),
+                  child: Text(
+                    formatAnswer(answers[i]),
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+}
+
 class _QuestionCard extends StatelessWidget {
   const _QuestionCard({
     super.key,

@@ -15,6 +15,18 @@ abstract interface class FormRepository {
 
   Future<void> deleteForm(String formId);
 
+  /// Adds [members] to a published form that is still open, and returns
+  /// the updated form. A completed form goes back to pending, since the new
+  /// recipients haven't responded yet.
+  Future<FormItem> addRecipients(String formId, List<Member> members);
+
+  /// Moves the deadline of a pending form to [deadline] (today or later),
+  /// reopening it if the old deadline had passed.
+  Future<FormItem> extendDeadline(String formId, DateTime deadline);
+
+  /// Closes a published form for good (結案).
+  Future<FormItem> closeForm(String formId);
+
   /// Records [response], replacing any earlier one from the same member,
   /// and returns the form with its updated responses and status.
   Future<FormItem> submitResponse(String formId, FormResponse response);

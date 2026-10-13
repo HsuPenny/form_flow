@@ -16,191 +16,75 @@ class OverviewPage extends StatefulWidget {
 class _OverviewPageState extends State<OverviewPage> {
   int _filter = 0; // index into the tabs built in [build]
   String _query = '';
-  final _search = TextEditingController();
-  bool _searchOpen = false; // narrow screens only
-
-  @override
-  void dispose() {
-    _search.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
     final app = AppScope.of(context);
     final nav = ShellNav.of(context);
-    final wide = isWide(context);
 
-    // Admins track the form as a whole; members only their own reply.
-    FormStatus statusOf(FormItem f) =>
-        app.isAdmin ? f.status : f.statusFor(app.me);
-
-    // Members only see forms that have been published.
-    final visible = app.isAdmin
-        ? app.forms
-        : app.forms.where((f) => f.status != FormStatus.draft).toList();
+    // Everyone, admins included, sees the published forms assigned to them,
+    // filed by their own reply. Drafts and form-wide progress live in 表單管理.
+    final me = app.me;
+    FormStatus statusOf(FormItem f) => f.statusFor(me);
+    final visible = app.forms
+        .where(
+          (f) => f.status != FormStatus.draft && f.recipients.contains(me),
+        )
+        .toList();
     final completed = visible
         .where((f) => statusOf(f) == FormStatus.completed)
         .toList();
     final pending = visible
         .where((f) => statusOf(f) == FormStatus.pending)
         .toList();
-    final drafts = visible.where((f) => f.status == FormStatus.draft).toList();
 
-    // Only admins can see drafts, so only they get the 草稿 tab.
     final tabs = <(String, List<FormItem>)>[
       ('全部', visible),
       ('待完成', pending),
       ('已完成', completed),
-      if (app.isAdmin) ('草稿', drafts),
     ];
-    if (_filter >= tabs.length) _filter = 0;
     final filtered = tabs[_filter].$2
         .where((f) => f.title.contains(_query.trim()))
         .toList();
 
-    final search = SizedBox(
-      width: wide ? 240 : double.infinity,
-      child: TextField(
-        controller: _search,
-        autofocus: !wide,
-        onChanged: (v) => setState(() => _query = v),
-        decoration: const InputDecoration(
-          hintText: '搜尋表單名稱',
-          fillColor: Colors.white,
-          prefixIcon: Icon(Icons.search, size: 18),
-          prefixIconConstraints: BoxConstraints(minWidth: 36),
-        ),
-      ),
-    );
-    // Narrow screens tuck search behind an icon next to the tabs.
-    final searchToggle = Material(
-      color: _searchOpen ? AppColors.primarySoft : AppColors.card,
-      borderRadius: BorderRadius.circular(AppRadius.sm),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(AppRadius.sm),
-        onTap: () => setState(() {
-          _searchOpen = !_searchOpen;
-          if (!_searchOpen) {
-            _search.clear();
-            _query = '';
-          }
-        }),
-        child: Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(AppRadius.sm),
-            border: Border.all(
-              color: _searchOpen ? AppColors.primary : AppColors.border,
-            ),
-          ),
-          child: Icon(
-            _searchOpen ? Icons.close : Icons.search,
-            size: 18,
-            color: _searchOpen ? AppColors.primaryDeep : AppColors.foreground,
-          ),
-        ),
-      ),
-    );
-    final tabBar = SegmentedTabs(
-      labels: [for (final t in tabs) t.$1],
-      counts: [for (final t in tabs) t.$2.length],
-      selected: _filter,
-      onChanged: (i) => setState(() => _filter = i),
-    );
-
-    return PageBody(
-      child: Column(
+    return ListPageBody(
+      onRefresh: () => runOrToast(context, app.refreshForms),
+      header: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          PageHeader(
-            eyebrow: app.isAdmin ? '表單管理' : '表單總覽',
-            title: app.isAdmin ? '把重要的事，問清楚' : '今天要回覆的表單',
-            subtitle: app.isAdmin
-                ? '建立清楚的提問，收回有脈絡的回覆。'
-                : '完成指派給你的表單，讓團隊知道你的想法。',
+          const PageHeader(
+            eyebrow: '表單總覽',
+            title: '今天要回覆的表單',
+            subtitle: '完成指派給你的表單，讓團隊知道你的想法。',
             icon: BrandGlyph.forms,
-            // Narrow screens use the shell's floating button instead.
-            action: app.isAdmin && wide
-                ? HeaderAction(
-                    icon: Icons.add,
-                    label: '建立新表單',
-                    onPressed: nav.openCreate,
-                  )
-                : null,
           ),
           const SizedBox(height: 20),
-          if (wide)
-            Row(children: [tabBar, const Spacer(), search])
-          else ...[
-            Row(
+          TabsWithSearch(
+            tabs: SegmentedTabs(
+              labels: [for (final t in tabs) t.$1],
+              counts: [for (final t in tabs) t.$2.length],
+              selected: _filter,
+              onChanged: (i) => setState(() => _filter = i),
+            ),
+            onQueryChanged: (v) => setState(() => _query = v),
+          ),
+        ],
+      ),
+      list: filtered.isEmpty
+          ? const _EmptyState()
+          : Column(
               children: [
-                Expanded(
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: tabBar,
+                for (final form in filtered) ...[
+                  _FormCard(
+                    form: form,
+                    status: statusOf(form),
+                    onView: () => nav.openForm(form),
                   ),
-                ),
-                const SizedBox(width: 8),
-                searchToggle,
+                  const SizedBox(height: 12),
+                ],
               ],
             ),
-            if (_searchOpen) ...[const SizedBox(height: 10), search],
-          ],
-          const SizedBox(height: 16),
-          if (filtered.isEmpty)
-            const _EmptyState()
-          else
-            for (final form in filtered) ...[
-              _FormCard(
-                form: form,
-                status: statusOf(form),
-                isAdmin: app.isAdmin,
-                onView: () => form.status == FormStatus.draft
-                    ? nav.openEdit(form)
-                    : nav.openForm(form),
-                onDelete: () => _confirmDelete(form),
-              ),
-              const SizedBox(height: 12),
-            ],
-          // Keep the last card clear of the floating 建立表單 button.
-          if (app.isAdmin && !wide) const SizedBox(height: 64),
-        ],
-      ),
     );
-  }
-
-  Future<void> _confirmDelete(FormItem form) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: Colors.white,
-        title: const Text('刪除表單？', style: TextStyle(fontSize: 18)),
-        content: Text('「${form.title}」會被移除，這個動作無法復原。'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: AppColors.destructive,
-            ),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('刪除'),
-          ),
-        ],
-      ),
-    );
-    if (ok != true || !mounted) return;
-    final app = AppScope.of(context);
-    final deleted = await runOrToast(
-      context,
-      () => app.deleteForm(form),
-      failure: '刪除失敗，請稍後再試',
-    );
-    if (deleted && mounted) showToast(context, '已刪除表單');
   }
 }
 
@@ -208,18 +92,14 @@ class _FormCard extends StatelessWidget {
   const _FormCard({
     required this.form,
     required this.status,
-    required this.isAdmin,
     required this.onView,
-    required this.onDelete,
   });
 
   final FormItem form;
 
   /// [FormItem.status] as the viewer sees it; see [FormItem.statusFor].
   final FormStatus status;
-  final bool isAdmin;
   final VoidCallback onView;
-  final VoidCallback onDelete;
 
   /// "剩 N 天" for open forms (orange when due within 3 days), otherwise
   /// the deadline date in gray.
@@ -244,8 +124,6 @@ class _FormCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (deadline, urgent) = _deadlineLabel();
-    // Admins track replies; members care about how long filling takes.
-    final showProgress = isAdmin && form.status != FormStatus.draft;
 
     return AppCard(
       onTap: onView,
@@ -258,7 +136,7 @@ class _FormCard extends StatelessWidget {
             children: [
               Expanded(
                 child: Padding(
-                  // Centers the first title line on the 28px trailing group.
+                  // Centers the first title line on the 28px badge row.
                   padding: const EdgeInsets.only(top: 3),
                   child: Text(
                     form.title,
@@ -270,35 +148,9 @@ class _FormCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 10),
-              // Fixed height so the badge and delete icon share one center
-              // line whether or not the delete button is shown.
               SizedBox(
                 height: 28,
-                child: Row(
-                  children: [
-                    StatusBadge.forStatus(status),
-                    if (isAdmin && form.status == FormStatus.draft) ...[
-                      const SizedBox(width: 2),
-                      IconButton(
-                        tooltip: '刪除',
-                        onPressed: onDelete,
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints.tightFor(
-                          width: 28,
-                          height: 28,
-                        ),
-                        style: IconButton.styleFrom(
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        ),
-                        icon: const Icon(
-                          Icons.delete_outline,
-                          size: 18,
-                          color: AppColors.destructive,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
+                child: Center(child: StatusBadge.forStatus(status)),
               ),
             ],
           ),
@@ -314,22 +166,6 @@ class _FormCard extends StatelessWidget {
               ),
             ),
           ],
-          if (showProgress) ...[
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(child: ProgressLine(form.progress)),
-                const SizedBox(width: 10),
-                Text(
-                  '${form.percent}%',
-                  style: AppText.mono.copyWith(
-                    fontSize: 11,
-                    color: AppColors.mutedForeground,
-                  ),
-                ),
-              ],
-            ),
-          ],
           const SizedBox(height: 10),
           Wrap(
             spacing: 6,
@@ -340,16 +176,10 @@ class _FormCard extends StatelessWidget {
                 text: deadline,
                 highlighted: urgent,
               ),
-              if (isAdmin)
-                _MetaChip(
-                  icon: Icons.format_list_numbered,
-                  text: '${form.questions.length} 題',
-                )
-              else
-                _MetaChip(
-                  icon: Icons.timer_outlined,
-                  text: '約 ${form.estimatedMinutes} 分鐘',
-                ),
+              _MetaChip(
+                icon: Icons.timer_outlined,
+                text: '約 ${form.estimatedMinutes} 分鐘',
+              ),
             ],
           ),
         ],

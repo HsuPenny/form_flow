@@ -835,7 +835,7 @@ class StatusBadge extends StatelessWidget {
   const StatusBadge(this.label, {super.key, this.tone = BadgeTone.primary});
 
   factory StatusBadge.forStatus(FormStatus status, {bool tracking = false}) {
-    // One color per status: 草稿 gray, 待完成 blue, 已完成 green.
+    // 草稿 and 已結案 gray (nothing left to do), 待完成 blue, 已完成 green.
     return switch (status) {
       FormStatus.draft => const StatusBadge('草稿', tone: BadgeTone.muted),
       FormStatus.pending => StatusBadge(
@@ -843,6 +843,7 @@ class StatusBadge extends StatelessWidget {
         tone: BadgeTone.accent,
       ),
       FormStatus.completed => const StatusBadge('已完成', tone: BadgeTone.success),
+      FormStatus.closed => const StatusBadge('已結案', tone: BadgeTone.muted),
     };
   }
 
@@ -901,27 +902,6 @@ class Avatar extends StatelessWidget {
         ),
       ),
     );
-  }
-}
-
-class ProgressLine extends StatelessWidget {
-  const ProgressLine(this.value, {super.key, this.width});
-
-  final double value;
-  final double? width;
-
-  @override
-  Widget build(BuildContext context) {
-    final bar = ClipRRect(
-      borderRadius: BorderRadius.circular(999),
-      child: LinearProgressIndicator(
-        value: value,
-        minHeight: 5,
-        backgroundColor: AppColors.muted,
-        color: AppColors.primaryDark,
-      ),
-    );
-    return width == null ? bar : SizedBox(width: width, child: bar);
   }
 }
 
@@ -1174,6 +1154,150 @@ class PageBody extends StatelessWidget {
           child: child,
         ),
       ),
+    );
+  }
+}
+
+/// Like [PageBody], but only [list] scrolls: [header] stays put above it.
+/// Pulling the list down calls [onRefresh].
+class ListPageBody extends StatelessWidget {
+  const ListPageBody({
+    super.key,
+    required this.header,
+    required this.list,
+    required this.onRefresh,
+    this.maxWidth = 1100,
+  });
+
+  final Widget header;
+  final Widget list;
+  final RefreshCallback onRefresh;
+  final double maxWidth;
+
+  @override
+  Widget build(BuildContext context) {
+    final wide = isWide(context);
+    final side = wide ? 40.0 : 16.0;
+    Widget constrained(Widget child) => Center(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: maxWidth),
+        child: child,
+      ),
+    );
+
+    return Column(
+      children: [
+        Padding(
+          padding: EdgeInsets.fromLTRB(side, wide ? 36 : 20, side, 16),
+          child: constrained(header),
+        ),
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: onRefresh,
+            child: SingleChildScrollView(
+              // Pullable even when the list is too short to scroll.
+              physics: const AlwaysScrollableScrollPhysics(),
+              // Room for the floating bottom navigation on narrow screens.
+              padding: EdgeInsets.fromLTRB(side, 0, side, wide ? 48 : 110),
+              child: constrained(list),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// [tabs] with a 搜尋表單名稱 box: beside them on wide screens, behind a
+/// toggle icon on narrow ones. Closing the box clears the query.
+class TabsWithSearch extends StatefulWidget {
+  const TabsWithSearch({
+    super.key,
+    required this.tabs,
+    required this.onQueryChanged,
+  });
+
+  final Widget tabs;
+  final ValueChanged<String> onQueryChanged;
+
+  @override
+  State<TabsWithSearch> createState() => _TabsWithSearchState();
+}
+
+class _TabsWithSearchState extends State<TabsWithSearch> {
+  final _search = TextEditingController();
+  bool _searchOpen = false; // narrow screens only
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final wide = isWide(context);
+    final search = SizedBox(
+      width: wide ? 240 : double.infinity,
+      child: TextField(
+        controller: _search,
+        autofocus: !wide,
+        onChanged: widget.onQueryChanged,
+        decoration: const InputDecoration(
+          hintText: '搜尋表單名稱',
+          fillColor: Colors.white,
+          prefixIcon: Icon(Icons.search, size: 18),
+          prefixIconConstraints: BoxConstraints(minWidth: 36),
+        ),
+      ),
+    );
+    if (wide) return Row(children: [widget.tabs, const Spacer(), search]);
+
+    final searchToggle = Material(
+      color: _searchOpen ? AppColors.primarySoft : AppColors.card,
+      borderRadius: BorderRadius.circular(AppRadius.sm),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+        onTap: () {
+          setState(() => _searchOpen = !_searchOpen);
+          if (!_searchOpen) {
+            _search.clear();
+            widget.onQueryChanged('');
+          }
+        },
+        child: Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(AppRadius.sm),
+            border: Border.all(
+              color: _searchOpen ? AppColors.primary : AppColors.border,
+            ),
+          ),
+          child: Icon(
+            _searchOpen ? Icons.close : Icons.search,
+            size: 18,
+            color: _searchOpen ? AppColors.primaryDeep : AppColors.foreground,
+          ),
+        ),
+      ),
+    );
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: widget.tabs,
+              ),
+            ),
+            const SizedBox(width: 8),
+            searchToggle,
+          ],
+        ),
+        if (_searchOpen) ...[const SizedBox(height: 10), search],
+      ],
     );
   }
 }

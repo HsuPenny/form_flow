@@ -165,6 +165,33 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Reloads forms and members, e.g. to pick up newly assigned forms and
+  /// other people's replies.
+  Future<void> refreshForms() async {
+    final (members, forms) = await (
+      _formRepo.fetchMembers(),
+      _formRepo.fetchForms(),
+    ).wait;
+    _members = members;
+    _forms = forms;
+    notifyListeners();
+  }
+
+  Future<void> addRecipients(FormItem form, List<Member> members) async {
+    _putForm(await _formRepo.addRecipients(form.id, members));
+    notifyListeners();
+  }
+
+  Future<void> extendDeadline(FormItem form, DateTime deadline) async {
+    _putForm(await _formRepo.extendDeadline(form.id, deadline));
+    notifyListeners();
+  }
+
+  Future<void> closeForm(FormItem form) async {
+    _putForm(await _formRepo.closeForm(form.id));
+    notifyListeners();
+  }
+
   Future<void> submitResponse(FormItem form, Answers answers) async {
     final response = FormResponse(
       member: me,
