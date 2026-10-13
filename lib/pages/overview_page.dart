@@ -31,21 +31,25 @@ class _OverviewPageState extends State<OverviewPage> {
     final nav = ShellNav.of(context);
     final wide = isWide(context);
 
-    // Admins track the form as a whole; members only their own reply.
-    FormStatus statusOf(FormItem f) =>
-        app.isAdmin ? f.status : f.statusFor(app.me);
-
-    // Members only see forms that have been published.
-    final visible = app.isAdmin
-        ? app.forms
-        : app.forms.where((f) => f.status != FormStatus.draft).toList();
+    // Everyone, admins included, sees the published forms assigned to them,
+    // filed by their own reply. Form-wide progress lives in 回覆追蹤.
+    final me = app.me;
+    FormStatus statusOf(FormItem f) => f.statusFor(me);
+    final visible = app.forms
+        .where(
+          (f) => f.status != FormStatus.draft && f.recipients.contains(me),
+        )
+        .toList();
     final completed = visible
         .where((f) => statusOf(f) == FormStatus.completed)
         .toList();
     final pending = visible
         .where((f) => statusOf(f) == FormStatus.pending)
         .toList();
-    final drafts = visible.where((f) => f.status == FormStatus.draft).toList();
+    // Drafts can only be edited from here, so admins keep this tab.
+    final drafts = app.isAdmin
+        ? app.forms.where((f) => f.status == FormStatus.draft).toList()
+        : <FormItem>[];
 
     // Only admins can see drafts, so only they get the 草稿 tab.
     final tabs = <(String, List<FormItem>)>[

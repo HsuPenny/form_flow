@@ -216,8 +216,8 @@ class _Done extends StatelessWidget {
             .where(
               (f) =>
                   f != form &&
-                  f.status == FormStatus.pending &&
-                  !f.hasResponded(me),
+                  f.recipients.contains(me) &&
+                  f.statusFor(me) == FormStatus.pending,
             )
             .toList()
           ..sort((a, b) => a.deadline.compareTo(b.deadline));
