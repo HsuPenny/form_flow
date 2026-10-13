@@ -4,6 +4,7 @@ import '../data/app_state.dart';
 import '../data/models.dart';
 import '../theme/app_theme.dart';
 import '../widgets/common.dart';
+import '../widgets/form_renderer.dart';
 import 'shell.dart';
 
 class TrackingPage extends StatefulWidget {
@@ -880,47 +881,9 @@ void showResponseDialog(
               const SizedBox(height: 12),
               Flexible(
                 child: SingleChildScrollView(
-                  child: Column(
-                    children: [
-                      for (var i = 0; i < form.questions.length; i++)
-                        Container(
-                          width: double.infinity,
-                          margin: const EdgeInsets.only(bottom: 10),
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(AppRadius.sm),
-                            border: Border.all(color: AppColors.border),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  NumberChip(i),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      form.questions[i].title,
-                                      style: const TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 8),
-                              Padding(
-                                padding: const EdgeInsets.only(left: 36),
-                                child: Text(
-                                  formatAnswer(response.answers[i]),
-                                  style: const TextStyle(fontSize: 12),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                    ],
+                  child: AnswerList(
+                    questions: form.questions,
+                    answers: response.answers,
                   ),
                 ),
               ),

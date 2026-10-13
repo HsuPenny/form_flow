@@ -191,11 +191,11 @@ class FormItem {
   bool hasResponded(Member m) => responses.any((r) => r.member == m);
 
   /// [status] as [m] sees it: a published form is done for them once they
-  /// have responded, even while other recipients still haven't.
-  FormStatus statusFor(Member m) =>
-      status == FormStatus.pending && hasResponded(m)
-      ? FormStatus.completed
-      : status;
+  /// have responded, whatever the other recipients have done.
+  FormStatus statusFor(Member m) => switch (status) {
+    FormStatus.draft => FormStatus.draft,
+    _ => hasResponded(m) ? FormStatus.completed : FormStatus.pending,
+  };
 
   FormResponse? responseOf(Member m) {
     for (final r in responses) {

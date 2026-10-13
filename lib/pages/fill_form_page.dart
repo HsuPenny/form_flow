@@ -17,7 +17,13 @@ class FillFormPage extends StatefulWidget {
 }
 
 class _FillFormPageState extends State<FillFormPage> {
-  final Answers _answers = {};
+  /// The viewer's earlier response, if any. Shown read-only first; 修改回覆
+  /// opens the questions with these answers filled in.
+  late final FormResponse? _previous = widget.form.responseOf(
+    AppScope.of(context).me,
+  );
+  late final Answers _answers = {...?_previous?.answers};
+  late bool _editing = _previous == null;
   bool _showErrors = false;
   bool _submitted = false;
   late final _questionKeys = [
@@ -65,7 +71,8 @@ class _FillFormPageState extends State<FillFormPage> {
 
   @override
   Widget build(BuildContext context) {
-    if (_submitted) return _Done(form: widget.form);
+    if (_submitted) return _Done(form: widget.form, updated: _previous != null);
+    if (!_editing) return _responseView(_previous!);
 
     final form = widget.form;
     final total = form.questions.length;
@@ -83,11 +90,17 @@ class _FillFormPageState extends State<FillFormPage> {
                   eyebrow: '已回答 $answered / $total 題',
                   title: form.title,
                   icon: BrandGlyph.fill,
-                  leading: HeaderAction(
-                    icon: Icons.arrow_back,
-                    label: '回到表單總覽',
-                    onPressed: ShellNav.of(context).closeSubPage,
-                  ),
+                  leading: _previous == null
+                      ? HeaderAction(
+                          icon: Icons.arrow_back,
+                          label: '回到表單總覽',
+                          onPressed: ShellNav.of(context).closeSubPage,
+                        )
+                      : HeaderAction(
+                          icon: Icons.close,
+                          label: '取消修改',
+                          onPressed: _cancelEditing,
+                        ),
                   bottom: _BannerProgress(total == 0 ? 0 : answered / total),
                 ),
                 const SizedBox(height: 16),
@@ -116,6 +129,69 @@ class _FillFormPageState extends State<FillFormPage> {
     );
   }
 
+  /// Drops unsent edits and goes back to the read-only response.
+  void _cancelEditing() => setState(() {
+    _answers
+      ..clear()
+      ..addAll(_previous!.answers);
+    _showErrors = false;
+    _editing = false;
+  });
+
+  /// The response the viewer already sent, with 修改回覆 to change it.
+  Widget _responseView(FormResponse response) {
+    final form = widget.form;
+    return Column(
+      children: [
+        Expanded(
+          child: PageBody(
+            maxWidth: 680,
+            bottomPadding: 24,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                PageHeader(
+                  eyebrow: '已於 ${formatDateTime(response.submittedAt)} 送出',
+                  title: form.title,
+                  icon: BrandGlyph.fill,
+                  leading: HeaderAction(
+                    icon: Icons.arrow_back,
+                    label: '回到表單總覽',
+                    onPressed: ShellNav.of(context).closeSubPage,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                FormHeading(
+                  showTitle: false,
+                  eyebrow: 'Formfield · My response',
+                  title: form.title,
+                  description: form.description,
+                  minutes: form.estimatedMinutes,
+                  deadline: form.deadline,
+                ),
+                const SizedBox(height: 20),
+                AnswerList(
+                  questions: form.questions,
+                  answers: response.answers,
+                ),
+              ],
+            ),
+          ),
+        ),
+        _ActionBar(
+          child: SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: () => setState(() => _editing = true),
+              icon: const Icon(Icons.edit_outlined, size: 16),
+              label: const Text('修改回覆'),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   /// Fixed bar: how many required questions are left, plus 送出回覆.
   Widget _submitBar() {
     final left = _missingRequired.length;
@@ -125,6 +201,49 @@ class _FillFormPageState extends State<FillFormPage> {
         : _showErrors
         ? AppColors.destructive
         : AppColors.mutedForeground;
+    return _ActionBar(
+      child: Row(
+        children: [
+          Icon(
+            left == 0
+                ? Icons.check_circle_outline
+                : _showErrors
+                ? Icons.error_outline
+                : Icons.info_outline,
+            size: 16,
+            color: status,
+          ),
+          const SizedBox(width: 6),
+          Text(
+            left == 0 ? '可以送出了' : '還有 $left 題必填',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: status,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: FilledButton.icon(
+              onPressed: _submit,
+              icon: const Icon(Icons.send_outlined, size: 16),
+              label: Text(_previous == null ? '送出回覆' : '更新回覆'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// White bar pinned to the bottom of the fill page.
+class _ActionBar extends StatelessWidget {
+  const _ActionBar({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
       decoration: const BoxDecoration(
         color: AppColors.card,
@@ -137,36 +256,7 @@ class _FillFormPageState extends State<FillFormPage> {
           child: Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 680),
-              child: Row(
-                children: [
-                  Icon(
-                    left == 0
-                        ? Icons.check_circle_outline
-                        : _showErrors
-                        ? Icons.error_outline
-                        : Icons.info_outline,
-                    size: 16,
-                    color: status,
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    left == 0 ? '可以送出了' : '還有 $left 題必填',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: status,
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: FilledButton.icon(
-                      onPressed: _submit,
-                      icon: const Icon(Icons.send_outlined, size: 16),
-                      label: const Text('送出回覆'),
-                    ),
-                  ),
-                ],
-              ),
+              child: child,
             ),
           ),
         ),
@@ -202,9 +292,12 @@ class _BannerProgress extends StatelessWidget {
 
 /// Thank-you screen shown after submitting, with the next form to fill.
 class _Done extends StatelessWidget {
-  const _Done({required this.form});
+  const _Done({required this.form, required this.updated});
 
   final FormItem form;
+
+  /// True when this replaced an earlier response.
+  final bool updated;
 
   @override
   Widget build(BuildContext context) {
@@ -244,13 +337,17 @@ class _Done extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 18),
-              const Text(
-                '已送出，謝謝你的回覆',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+              Text(
+                updated ? '已更新你的回覆' : '已送出，謝謝你的回覆',
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
               const SizedBox(height: 6),
               Text(
-                '「${form.title}」\n已送出 ${form.questions.length} 題回答',
+                '「${form.title}」\n'
+                '已${updated ? '更新' : '送出'} ${form.questions.length} 題回答',
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   fontSize: 13,
