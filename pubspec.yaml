@@ -38,6 +38,7 @@ dependencies:
   uuid: ^4.6.0
   dio: ^5.11.1
   flutter_secure_storage: ^11.2.0
+  custom_refresh_indicator: ^4.0.2
 
 dev_dependencies:
   flutter_test:

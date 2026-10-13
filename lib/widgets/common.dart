@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:custom_refresh_indicator/custom_refresh_indicator.dart';
 import 'package:flutter/material.dart';
 
 import '../data/models.dart';
@@ -1192,8 +1193,10 @@ class ListPageBody extends StatelessWidget {
           child: constrained(header),
         ),
         Expanded(
-          child: RefreshIndicator(
+          child: CustomRefreshIndicator(
             onRefresh: onRefresh,
+            builder: (context, child, controller) =>
+                _PullToRefreshFrame(controller: controller, child: child),
             child: SingleChildScrollView(
               // Pullable even when the list is too short to scroll.
               physics: const AlwaysScrollableScrollPhysics(),
@@ -1206,6 +1209,157 @@ class ListPageBody extends StatelessWidget {
       ],
     );
   }
+}
+
+/// Slides the list down while pulling and lines up sparkles above it: they
+/// pop in one by one as the pull arms, then hop in a wave while refreshing.
+class _PullToRefreshFrame extends StatefulWidget {
+  const _PullToRefreshFrame({required this.controller, required this.child});
+
+  final IndicatorController controller;
+  final Widget child;
+
+  @override
+  State<_PullToRefreshFrame> createState() => _PullToRefreshFrameState();
+}
+
+class _PullToRefreshFrameState extends State<_PullToRefreshFrame>
+    with SingleTickerProviderStateMixin {
+  static const _extent = 80.0;
+
+  late final _loop = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1100),
+  );
+
+  IndicatorController get _c => widget.controller;
+  bool get _busy => _c.isSettling || _c.isLoading;
+
+  @override
+  void didUpdateWidget(_PullToRefreshFrame oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_busy && !_loop.isAnimating) {
+      _loop.repeat();
+    } else if (!_busy && _loop.isAnimating) {
+      // Let the current hop land instead of freezing mid-air.
+      _loop.forward().then((_) => _loop.reset());
+    }
+  }
+
+  @override
+  void dispose() {
+    _loop.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final pull = _c.value.clamp(0.0, 1.0);
+    // Keep every sparkle out from release until the indicator has gone away.
+    final shown = _c.isDragging || _c.isArmed || _c.isCanceling ? pull : 1.0;
+    final label = switch (_c.state) {
+      IndicatorState.armed => '放開以重新整理',
+      IndicatorState.settling || IndicatorState.loading => '更新中…',
+      IndicatorState.complete || IndicatorState.finalizing => '已更新',
+      _ => '下拉重新整理',
+    };
+
+    return ClipRect(
+      child: Stack(
+        children: [
+          Transform.translate(
+            offset: Offset(0, _extent * pull),
+            child: widget.child,
+          ),
+          if (!_c.isIdle)
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              height: _extent * pull,
+              child: OverflowBox(
+                maxHeight: _extent,
+                alignment: Alignment.bottomCenter,
+                child: Opacity(
+                  opacity: Curves.easeIn.transform(pull),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      AnimatedBuilder(
+                        animation: _loop,
+                        builder: (context, _) => CustomPaint(
+                          size: const Size(_SparkleRowPainter.width, 30),
+                          painter: _SparkleRowPainter(
+                            shown: shown,
+                            loop: _loop.value,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        label,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.mutedForeground,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// A row of sparkles, popped in up to [shown] (0–1) and hopping with [loop].
+class _SparkleRowPainter extends CustomPainter {
+  const _SparkleRowPainter({required this.shown, required this.loop});
+
+  final double shown;
+  final double loop;
+
+  /// Radius of each sparkle, big and small in turn like the logo's pair.
+  static const _radii = [5.0, 8.0, 5.0, 8.0, 5.0];
+  static const _gap = 22.0;
+  static const width = _gap * 4 + 16;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final colors = [AppColors.primary, AppColors.primaryDark];
+    final baseline = size.height - 9;
+
+    for (var i = 0; i < _radii.length; i++) {
+      // Each sparkle pops over its own slice of the pull, left to right.
+      final from = i * 0.15;
+      final t = ((shown - from) / 0.4).clamp(0.0, 1.0);
+      final pop = Curves.elasticOut.transform(t);
+      if (pop <= 0) continue;
+
+      final phase = loop - i * 0.12;
+      final hop = math.max(0.0, math.sin(2 * math.pi * phase));
+      final twinkle = loop == 0 ? 1.0 : 1 + 0.25 * hop;
+      final center = Offset(8 + _gap * i, baseline - 12 * hop);
+
+      canvas.save();
+      canvas.translate(center.dx, center.dy);
+      canvas.rotate(math.pi / 2 * hop);
+      paintSparkle(
+        canvas,
+        Offset.zero,
+        _radii[i] * pop * twinkle,
+        Paint()..color = colors[i % 2],
+      );
+      canvas.restore();
+    }
+  }
+
+  @override
+  bool shouldRepaint(_SparkleRowPainter old) =>
+      old.shown != shown || old.loop != loop;
 }
 
 /// [tabs] with a 搜尋表單名稱 box: beside them on wide screens, behind a
