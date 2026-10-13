@@ -4,6 +4,7 @@ import '../data/app_state.dart';
 import '../data/models.dart';
 import '../theme/app_theme.dart';
 import '../widgets/common.dart';
+import 'shell.dart';
 
 class TrackingPage extends StatefulWidget {
   const TrackingPage({super.key});
@@ -13,54 +14,80 @@ class TrackingPage extends StatefulWidget {
 }
 
 class _TrackingPageState extends State<TrackingPage> {
-  String? _formFilter; // form id, null = 全部表單
-  int _tab = 0; // 0 完成進度, 1 最新回覆
+  int _tab = 0; // 0 完成進度, 1 最新回覆, 2 草稿
+  String _query = '';
   String? _expandedId;
 
   @override
   Widget build(BuildContext context) {
     final app = AppScope.of(context);
-    final forms = _formFilter == null
-        ? app.forms
-        : app.forms.where((f) => f.id == _formFilter).toList();
+    final nav = ShellNav.of(context);
+    final wide = isWide(context);
+    // Drafts have no replies yet, so they only show up under 草稿.
+    final published = app.forms
+        .where((f) => f.status != FormStatus.draft)
+        .toList();
+    bool matches(FormItem f) => f.title.contains(_query.trim());
+    final forms = published.where(matches).toList();
+    final drafts = app.forms
+        .where((f) => f.status == FormStatus.draft && matches(f))
+        .toList();
 
     return PageBody(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const PageHeader(
-            eyebrow: '回覆追蹤',
-            title: '看見事情走到哪裡',
-            subtitle: '點選一份表單，查看已回覆與未回覆名單；再點選已回覆的人即可查看答案。',
+          PageHeader(
+            eyebrow: '表單管理',
+            title: '把重要的事，問清楚',
+            subtitle: '建立與編輯表單；點選一份表單查看已回覆與未回覆名單，再點選已回覆的人即可查看答案。',
             icon: BrandGlyph.tracking,
+            // Narrow screens use the shell's floating button instead.
+            action: wide
+                ? HeaderAction(
+                    icon: Icons.add,
+                    label: '建立新表單',
+                    onPressed: nav.openCreate,
+                  )
+                : null,
           ),
           const SizedBox(height: 12),
-          _StatTiles(forms),
-          const SizedBox(height: 12),
-          AppDropdownField<String?>(
-            value: _formFilter,
-            icon: Icons.filter_list,
-            fillColor: Colors.white,
-            items: [(null, '全部表單'), for (final f in app.forms) (f.id, f.title)],
-            onChanged: (v) => setState(() {
-              _formFilter = v;
-              _expandedId = v;
-            }),
-          ),
+          // Totals across every published form, whatever the search.
+          _StatTiles(published),
           const SizedBox(height: 16),
-          SegmentedTabs(
-            labels: const ['完成進度', '最新回覆'],
-            selected: _tab,
-            onChanged: (i) => setState(() => _tab = i),
+          TabsWithSearch(
+            tabs: SegmentedTabs(
+              labels: const ['完成進度', '最新回覆', '草稿'],
+              selected: _tab,
+              onChanged: (i) => setState(() => _tab = i),
+            ),
+            onQueryChanged: (v) => setState(() => _query = v),
           ),
           const SizedBox(height: 12),
-          if (_tab == 0) _progressView(forms) else _Timeline(forms),
+          switch (_tab) {
+            0 => _progressView(forms),
+            1 => _Timeline(forms),
+            _ => _DraftList(drafts),
+          },
+          // Keep the last card clear of the floating 建立表單 button.
+          if (!wide) const SizedBox(height: 64),
         ],
       ),
     );
   }
 
   Widget _progressView(List<FormItem> forms) {
+    if (forms.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 40),
+        child: Center(
+          child: Text(
+            '這裡目前沒有表單',
+            style: TextStyle(fontSize: 12, color: AppColors.mutedForeground),
+          ),
+        ),
+      );
+    }
     final wide = isWide(context);
     FormItem? expanded;
     for (final f in forms) {
@@ -242,10 +269,6 @@ class _ProgressCard extends StatelessWidget {
                 ],
               ),
             ),
-            if (form.status == FormStatus.draft) ...[
-              const StatusBadge('草稿', tone: BadgeTone.muted),
-              const SizedBox(width: 6),
-            ],
             Icon(
               expanded ? Icons.expand_less : Icons.expand_more,
               size: 20,
@@ -507,11 +530,125 @@ class _RecipientListState extends State<_RecipientList> {
   }
 }
 
-/// 最新回覆: newest first, grouped by day (今天 / 昨天 / date).
-class _Timeline extends StatelessWidget {
+/// 草稿: unpublished forms. Tap one to keep editing it.
+class _DraftList extends StatelessWidget {
+  const _DraftList(this.drafts);
+
+  final List<FormItem> drafts;
+
+  @override
+  Widget build(BuildContext context) {
+    if (drafts.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 40),
+        child: Center(
+          child: Text(
+            '目前沒有草稿',
+            style: TextStyle(fontSize: 12, color: AppColors.mutedForeground),
+          ),
+        ),
+      );
+    }
+
+    final nav = ShellNav.of(context);
+    return Column(
+      children: [
+        for (final form in drafts) ...[
+          AppCard(
+            onTap: () => nav.openEdit(form),
+            padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        form.title,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        '${formatDate(form.deadline)} 截止 · '
+                        '${form.questions.length} 題 · '
+                        '${form.totalCount} 人',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: AppColors.mutedForeground,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const StatusBadge('草稿', tone: BadgeTone.muted),
+                IconButton(
+                  tooltip: '刪除',
+                  onPressed: () => _confirmDelete(context, form),
+                  icon: const Icon(
+                    Icons.delete_outline,
+                    size: 18,
+                    color: AppColors.destructive,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+        ],
+      ],
+    );
+  }
+
+  Future<void> _confirmDelete(BuildContext context, FormItem form) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.white,
+        title: const Text('刪除表單？', style: TextStyle(fontSize: 18)),
+        content: Text('「${form.title}」會被移除，這個動作無法復原。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.destructive,
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('刪除'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !context.mounted) return;
+    final app = AppScope.of(context);
+    final deleted = await runOrToast(
+      context,
+      () => app.deleteForm(form),
+      failure: '刪除失敗，請稍後再試',
+    );
+    if (deleted && context.mounted) showToast(context, '已刪除表單');
+  }
+}
+
+/// 最新回覆: newest first, grouped by day (今天 / 昨天 / date). Shows
+/// [_pageSize] at a time; 顯示更多 reveals the next batch.
+class _Timeline extends StatefulWidget {
   const _Timeline(this.forms);
 
   final List<FormItem> forms;
+
+  @override
+  State<_Timeline> createState() => _TimelineState();
+}
+
+class _TimelineState extends State<_Timeline> {
+  static const _pageSize = 50;
+  int _limit = _pageSize;
 
   static String _dayLabel(DateTime d) {
     final now = DateTime.now();
@@ -526,12 +663,14 @@ class _Timeline extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final rows = [
-      for (final f in forms)
+    final all = [
+      for (final f in widget.forms)
         for (final r in f.responses) (form: f, response: r),
     ]..sort((a, b) => b.response.submittedAt.compareTo(a.response.submittedAt));
+    final rows = all.take(_limit);
+    final hidden = all.length - rows.length;
 
-    if (rows.isEmpty) {
+    if (all.isEmpty) {
       return const Padding(
         padding: EdgeInsets.symmetric(vertical: 40),
         child: Center(
@@ -572,6 +711,17 @@ class _Timeline extends StatelessWidget {
               items[i].response,
               last: i == items.length - 1,
             ),
+        ],
+        if (hidden > 0) ...[
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton(
+              style: OutlinedButton.styleFrom(minimumSize: const Size(0, 40)),
+              onPressed: () => setState(() => _limit += _pageSize),
+              child: Text('顯示更多（還有 $hidden 筆）'),
+            ),
+          ),
         ],
       ],
     );

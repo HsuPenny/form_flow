@@ -15,7 +15,7 @@ enum AppSection { overview, tracking, settings }
 extension on AppSection {
   String get label => switch (this) {
     AppSection.overview => '表單總覽',
-    AppSection.tracking => '回覆追蹤',
+    AppSection.tracking => '表單管理',
     AppSection.settings => '個人設定',
   };
 
@@ -130,12 +130,12 @@ class AppShellState extends State<AppShell> {
                   : body,
             ),
           ),
-          // On wide screens the overview header shows this action instead.
+          // On wide screens the 表單管理 header shows this action instead.
           floatingActionButton:
               !wide &&
                   app.isAdmin &&
                   _subPage == null &&
-                  _section == AppSection.overview
+                  _section == AppSection.tracking
               ? FloatingActionButton.extended(
                   onPressed: openCreate,
                   icon: const Icon(Icons.add, size: 18),

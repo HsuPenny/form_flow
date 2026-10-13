@@ -1178,6 +1178,100 @@ class PageBody extends StatelessWidget {
   }
 }
 
+/// [tabs] with a 搜尋表單名稱 box: beside them on wide screens, behind a
+/// toggle icon on narrow ones. Closing the box clears the query.
+class TabsWithSearch extends StatefulWidget {
+  const TabsWithSearch({
+    super.key,
+    required this.tabs,
+    required this.onQueryChanged,
+  });
+
+  final Widget tabs;
+  final ValueChanged<String> onQueryChanged;
+
+  @override
+  State<TabsWithSearch> createState() => _TabsWithSearchState();
+}
+
+class _TabsWithSearchState extends State<TabsWithSearch> {
+  final _search = TextEditingController();
+  bool _searchOpen = false; // narrow screens only
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final wide = isWide(context);
+    final search = SizedBox(
+      width: wide ? 240 : double.infinity,
+      child: TextField(
+        controller: _search,
+        autofocus: !wide,
+        onChanged: widget.onQueryChanged,
+        decoration: const InputDecoration(
+          hintText: '搜尋表單名稱',
+          fillColor: Colors.white,
+          prefixIcon: Icon(Icons.search, size: 18),
+          prefixIconConstraints: BoxConstraints(minWidth: 36),
+        ),
+      ),
+    );
+    if (wide) return Row(children: [widget.tabs, const Spacer(), search]);
+
+    final searchToggle = Material(
+      color: _searchOpen ? AppColors.primarySoft : AppColors.card,
+      borderRadius: BorderRadius.circular(AppRadius.sm),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+        onTap: () {
+          setState(() => _searchOpen = !_searchOpen);
+          if (!_searchOpen) {
+            _search.clear();
+            widget.onQueryChanged('');
+          }
+        },
+        child: Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(AppRadius.sm),
+            border: Border.all(
+              color: _searchOpen ? AppColors.primary : AppColors.border,
+            ),
+          ),
+          child: Icon(
+            _searchOpen ? Icons.close : Icons.search,
+            size: 18,
+            color: _searchOpen ? AppColors.primaryDeep : AppColors.foreground,
+          ),
+        ),
+      ),
+    );
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: widget.tabs,
+              ),
+            ),
+            const SizedBox(width: 8),
+            searchToggle,
+          ],
+        ),
+        if (_searchOpen) ...[const SizedBox(height: 10), search],
+      ],
+    );
+  }
+}
+
 void showToast(BuildContext context, String message) {
   ScaffoldMessenger.of(context)
     ..hideCurrentSnackBar()
