@@ -189,6 +189,14 @@ class FormItem {
   int get estimatedMinutes => (questions.length * 1.2).ceil().clamp(1, 60);
 
   bool hasResponded(Member m) => responses.any((r) => r.member == m);
+
+  /// [status] as [m] sees it: a published form is done for them once they
+  /// have responded, even while other recipients still haven't.
+  FormStatus statusFor(Member m) =>
+      status == FormStatus.pending && hasResponded(m)
+      ? FormStatus.completed
+      : status;
+
   FormResponse? responseOf(Member m) {
     for (final r in responses) {
       if (r.member == m) return r;

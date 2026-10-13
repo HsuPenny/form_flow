@@ -64,7 +64,13 @@ class FakeSupabase implements HttpClientAdapter {
                 'msg': 'Unable to validate email address',
               }, 400)
             : _json({});
-      case ('POST', '/auth/v1/verify') when body!['type'] == 'recovery':
+      case ('POST', '/auth/v1/signup'):
+        // As with "Confirm email" on: just the user, no session.
+        return _json({'id': userId, 'email': body!['email']});
+      case ('POST', '/auth/v1/resend'):
+        return _json({});
+      case ('POST', '/auth/v1/verify')
+          when body!['type'] == 'recovery' || body['type'] == 'signup':
         return body['token'] == '123456'
             ? _json(_session())
             : _json({
@@ -245,11 +251,16 @@ void main() {
   });
 
   test('reset password verifies the code, then sets the password', () async {
-    final profile = await auth.resetPassword(
-      email: 'lisa@example.com',
-      code: '123456',
-      newPassword: 'new-secret',
-    );
+    await auth.verifyRecoveryCode(email: 'lisa@example.com', code: '123456');
+    final verify = server.requests.last;
+    expect(verify.path, '/auth/v1/verify');
+    expect(verify.data, {
+      'type': 'recovery',
+      'email': 'lisa@example.com',
+      'token': '123456',
+    });
+
+    final profile = await auth.resetPassword(newPassword: 'new-secret');
     expect(profile.displayName, '王莉莎');
     final put = server.requests.firstWhere((r) => r.path == '/auth/v1/user');
     expect(put.method, 'PUT');
@@ -259,11 +270,7 @@ void main() {
 
   test('a wrong reset code becomes a readable AuthFailure', () async {
     await expectLater(
-      auth.resetPassword(
-        email: 'lisa@example.com',
-        code: '000000',
-        newPassword: 'new-secret',
-      ),
+      auth.verifyRecoveryCode(email: 'lisa@example.com', code: '000000'),
       throwsA(
         isA<AuthFailure>().having(
           (e) => e.message,
@@ -275,16 +282,45 @@ void main() {
     expect(api.sessions.current, isNull);
   });
 
-  test('a rejected new password leaves the user signed out', () async {
+  test('a rejected new password can be retried or cancelled', () async {
+    await auth.verifyRecoveryCode(email: 'lisa@example.com', code: '123456');
     await expectLater(
-      auth.resetPassword(
-        email: 'lisa@example.com',
-        code: '123456',
-        newPassword: 'old-password',
-      ),
+      auth.resetPassword(newPassword: 'old-password'),
       throwsA(isA<AuthFailure>()),
     );
+    // Still allowed to try another password.
+    expect(api.sessions.current, isNotNull);
+
+    await auth.cancelPasswordReset();
     expect(api.sessions.current, isNull);
+  });
+
+  test('sign-up waits for the emailed code', () async {
+    final profile = await auth.signUp(
+      email: 'new@example.com',
+      password: 'secret',
+      displayName: '新同事',
+    );
+    expect(profile, isNull);
+    expect(api.sessions.current, isNull);
+
+    await auth.resendSignUpCode(email: 'new@example.com');
+    expect(server.requests.last.path, '/auth/v1/resend');
+    expect(server.requests.last.data, {
+      'type': 'signup',
+      'email': 'new@example.com',
+    });
+
+    await expectLater(
+      auth.verifySignUp(email: 'new@example.com', code: '000000'),
+      throwsA(isA<AuthFailure>()),
+    );
+    final signedIn = await auth.verifySignUp(
+      email: 'new@example.com',
+      code: '123456',
+    );
+    expect(signedIn.displayName, '王莉莎');
+    expect(server.requests.last.path, '/rest/v1/profiles');
   });
 
   test('change password checks the current one first', () async {

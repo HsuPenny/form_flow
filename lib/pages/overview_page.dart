@@ -31,15 +31,19 @@ class _OverviewPageState extends State<OverviewPage> {
     final nav = ShellNav.of(context);
     final wide = isWide(context);
 
+    // Admins track the form as a whole; members only their own reply.
+    FormStatus statusOf(FormItem f) =>
+        app.isAdmin ? f.status : f.statusFor(app.me);
+
     // Members only see forms that have been published.
     final visible = app.isAdmin
         ? app.forms
         : app.forms.where((f) => f.status != FormStatus.draft).toList();
     final completed = visible
-        .where((f) => f.status == FormStatus.completed)
+        .where((f) => statusOf(f) == FormStatus.completed)
         .toList();
     final pending = visible
-        .where((f) => f.status == FormStatus.pending)
+        .where((f) => statusOf(f) == FormStatus.pending)
         .toList();
     final drafts = visible.where((f) => f.status == FormStatus.draft).toList();
 
@@ -151,6 +155,7 @@ class _OverviewPageState extends State<OverviewPage> {
             for (final form in filtered) ...[
               _FormCard(
                 form: form,
+                status: statusOf(form),
                 isAdmin: app.isAdmin,
                 onView: () => form.status == FormStatus.draft
                     ? nav.openEdit(form)
@@ -202,12 +207,16 @@ class _OverviewPageState extends State<OverviewPage> {
 class _FormCard extends StatelessWidget {
   const _FormCard({
     required this.form,
+    required this.status,
     required this.isAdmin,
     required this.onView,
     required this.onDelete,
   });
 
   final FormItem form;
+
+  /// [FormItem.status] as the viewer sees it; see [FormItem.statusFor].
+  final FormStatus status;
   final bool isAdmin;
   final VoidCallback onView;
   final VoidCallback onDelete;
@@ -216,7 +225,7 @@ class _FormCard extends StatelessWidget {
   /// the deadline date in gray.
   (String, bool urgent) _deadlineLabel() {
     final date = formatDate(form.deadline).substring(5).replaceAll('-', '/');
-    if (form.status != FormStatus.pending) return ('$date 截止', false);
+    if (status != FormStatus.pending) return ('$date 截止', false);
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final due = DateTime(
@@ -267,7 +276,7 @@ class _FormCard extends StatelessWidget {
                 height: 28,
                 child: Row(
                   children: [
-                    StatusBadge.forForm(form),
+                    StatusBadge.forStatus(status),
                     if (isAdmin && form.status == FormStatus.draft) ...[
                       const SizedBox(width: 2),
                       IconButton(

@@ -10,30 +10,54 @@ class AuthFailure implements Exception {
   String toString() => 'AuthFailure: $message';
 }
 
+/// Sign-in was refused because the email hasn't been verified yet; the user
+/// has to enter the code from the sign-up email first.
+class EmailNotConfirmed extends AuthFailure {
+  const EmailNotConfirmed() : super('這個信箱還沒完成驗證，請輸入寄到信箱的驗證碼');
+}
+
 /// Sign-in and the signed-in user's profile.
 ///
-/// Sign-in methods throw [AuthFailure] for problems the user can fix.
+/// Sign-in methods throw [AuthFailure] for problems the user can fix, and
+/// [EmailNotConfirmed] when the account still needs its sign-up code.
 abstract interface class AuthRepository {
   /// The profile for a session restored from a previous launch, if any.
   Future<UserProfile?> currentUser();
 
   Future<UserProfile> signIn({required String email, required String password});
 
-  Future<UserProfile> signUp({
+  /// Creates the account and signs in, or returns null when a verification
+  /// code was emailed instead; [verifySignUp] then finishes signing in.
+  Future<UserProfile?> signUp({
     required String email,
     required String password,
     required String displayName,
   });
 
-  /// Emails [email] a link to set a new password.
-  Future<void> sendPasswordReset({required String email});
-
-  /// Checks the [code] from the reset email, sets [newPassword] and signs in.
-  Future<UserProfile> resetPassword({
+  /// Checks the [code] from the sign-up email and signs in.
+  Future<UserProfile> verifySignUp({
     required String email,
     required String code,
-    required String newPassword,
   });
+
+  /// Emails [email] a new sign-up verification code.
+  Future<void> resendSignUpCode({required String email});
+
+  /// Emails [email] a code for setting a new password.
+  Future<void> sendPasswordReset({required String email});
+
+  /// Checks the [code] from the reset email. On success [resetPassword] may
+  /// set the new password, or [cancelPasswordReset] gives up.
+  Future<void> verifyRecoveryCode({
+    required String email,
+    required String code,
+  });
+
+  /// Sets [newPassword] after [verifyRecoveryCode] and signs in.
+  Future<UserProfile> resetPassword({required String newPassword});
+
+  /// Drops what [verifyRecoveryCode] allowed, so the user stays signed out.
+  Future<void> cancelPasswordReset();
 
   /// Changes the signed-in user's password after checking [currentPassword].
   Future<void> changePassword({
