@@ -1158,6 +1158,56 @@ class PageBody extends StatelessWidget {
   }
 }
 
+/// Like [PageBody], but only [list] scrolls: [header] stays put above it.
+/// Pulling the list down calls [onRefresh].
+class ListPageBody extends StatelessWidget {
+  const ListPageBody({
+    super.key,
+    required this.header,
+    required this.list,
+    required this.onRefresh,
+    this.maxWidth = 1100,
+  });
+
+  final Widget header;
+  final Widget list;
+  final RefreshCallback onRefresh;
+  final double maxWidth;
+
+  @override
+  Widget build(BuildContext context) {
+    final wide = isWide(context);
+    final side = wide ? 40.0 : 16.0;
+    Widget constrained(Widget child) => Center(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: maxWidth),
+        child: child,
+      ),
+    );
+
+    return Column(
+      children: [
+        Padding(
+          padding: EdgeInsets.fromLTRB(side, wide ? 36 : 20, side, 16),
+          child: constrained(header),
+        ),
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: onRefresh,
+            child: SingleChildScrollView(
+              // Pullable even when the list is too short to scroll.
+              physics: const AlwaysScrollableScrollPhysics(),
+              // Room for the floating bottom navigation on narrow screens.
+              padding: EdgeInsets.fromLTRB(side, 0, side, wide ? 48 : 110),
+              child: constrained(list),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 /// [tabs] with a 搜尋表單名稱 box: beside them on wide screens, behind a
 /// toggle icon on narrow ones. Closing the box clears the query.
 class TabsWithSearch extends StatefulWidget {

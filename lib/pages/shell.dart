@@ -50,10 +50,17 @@ class AppShellState extends State<AppShell> {
   AppSection _section = AppSection.overview;
   Widget? _subPage;
 
-  void goTo(AppSection section) => setState(() {
-    _section = section;
-    _subPage = null;
-  });
+  void goTo(AppSection section) {
+    setState(() {
+      _section = section;
+      _subPage = null;
+    });
+    // Pull-to-refresh needs touch, so also refresh on every section switch;
+    // the page keeps showing what it has if this fails.
+    AppScope.of(context).refreshForms().catchError((Object e) {
+      debugPrint('Could not refresh forms: $e');
+    });
+  }
 
   void openForm(FormItem form) => setState(() {
     _subPage = FillFormPage(form: form, key: ValueKey(form.id));

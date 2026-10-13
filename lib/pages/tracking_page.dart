@@ -35,8 +35,9 @@ class _TrackingPageState extends State<TrackingPage> {
         .where((f) => f.status == FormStatus.draft && matches(f))
         .toList();
 
-    return PageBody(
-      child: Column(
+    return ListPageBody(
+      onRefresh: () => runOrToast(context, app.refreshForms),
+      header: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           PageHeader(
@@ -65,7 +66,11 @@ class _TrackingPageState extends State<TrackingPage> {
             ),
             onQueryChanged: (v) => setState(() => _query = v),
           ),
-          const SizedBox(height: 12),
+        ],
+      ),
+      list: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
           switch (_tab) {
             0 => _progressView(forms),
             1 => _Timeline(forms),

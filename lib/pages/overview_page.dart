@@ -47,8 +47,9 @@ class _OverviewPageState extends State<OverviewPage> {
         .where((f) => f.title.contains(_query.trim()))
         .toList();
 
-    return PageBody(
-      child: Column(
+    return ListPageBody(
+      onRefresh: () => runOrToast(context, app.refreshForms),
+      header: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const PageHeader(
@@ -67,20 +68,22 @@ class _OverviewPageState extends State<OverviewPage> {
             ),
             onQueryChanged: (v) => setState(() => _query = v),
           ),
-          const SizedBox(height: 16),
-          if (filtered.isEmpty)
-            const _EmptyState()
-          else
-            for (final form in filtered) ...[
-              _FormCard(
-                form: form,
-                status: statusOf(form),
-                onView: () => nav.openForm(form),
-              ),
-              const SizedBox(height: 12),
-            ],
         ],
       ),
+      list: filtered.isEmpty
+          ? const _EmptyState()
+          : Column(
+              children: [
+                for (final form in filtered) ...[
+                  _FormCard(
+                    form: form,
+                    status: statusOf(form),
+                    onView: () => nav.openForm(form),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+              ],
+            ),
     );
   }
 }
