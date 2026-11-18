@@ -1,11 +1,16 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../data/app_state.dart';
+import '../data/form_report.dart';
 import '../data/models.dart';
 import '../theme/app_theme.dart';
 import '../widgets/common.dart';
 import '../widgets/form_renderer.dart';
 import '../widgets/recipient_picker.dart';
+import '../widgets/response_stats.dart';
 import 'shell.dart';
 
 class TrackingPage extends StatefulWidget {
@@ -384,8 +389,11 @@ class _RecipientsPanel extends StatelessWidget {
   }
 }
 
-/// 未回覆 / 已回覆 toggle plus the matching people. Starts on 未回覆,
-/// since those are the people you usually need to chase.
+enum _View { waiting, responded, stats }
+
+/// 未回覆 / 已回覆 / 統計 toggle plus the matching people or the per-question
+/// stats. Starts on 未回覆, since those are the people you usually need to
+/// chase.
 class _RecipientList extends StatefulWidget {
   const _RecipientList(this.form, {super.key});
 
@@ -396,7 +404,38 @@ class _RecipientList extends StatefulWidget {
 }
 
 class _RecipientListState extends State<_RecipientList> {
-  late bool _waiting = widget.form.respondedCount < widget.form.totalCount;
+  late _View _view = widget.form.respondedCount < widget.form.totalCount
+      ? _View.waiting
+      : _View.responded;
+
+  /// Hands the replies to the share sheet as a CSV (a download on the web).
+  /// [button] anchors the sheet's popover on iPad and macOS.
+  Future<void> _exportCsv(BuildContext button) async {
+    final form = widget.form;
+    final box = button.findRenderObject() as RenderBox?;
+    final origin = box == null
+        ? null
+        : box.localToGlobal(Offset.zero) & box.size;
+    final name = csvFileName(form);
+    await runOrToast(
+      context,
+      () => SharePlus.instance.share(
+        ShareParams(
+          files: [
+            XFile.fromData(
+              utf8.encode(formToCsv(form)),
+              name: name,
+              mimeType: 'text/csv',
+            ),
+          ],
+          fileNameOverrides: [name],
+          subject: form.title,
+          sharePositionOrigin: origin,
+        ),
+      ),
+      failure: '匯出失敗，請稍後再試',
+    );
+  }
 
   /// Picks people who aren't recipients yet and adds them to the form.
   Future<void> _addRecipients() async {
@@ -416,7 +455,7 @@ class _RecipientListState extends State<_RecipientList> {
       failure: '新增失敗，請稍後再試',
     );
     if (!added || !mounted) return;
-    setState(() => _waiting = true);
+    setState(() => _view = _View.waiting);
     showToast(context, '已新增 ${picked.length} 位填寫人員');
   }
 
@@ -481,27 +520,34 @@ class _RecipientListState extends State<_RecipientList> {
   }
 
   /// What an admin can still do with this form: add people until the
-  /// deadline, extend it while replies are missing, close it once published.
+  /// deadline, extend it while replies are missing, close it once published,
+  /// and export the replies once there are any.
   Widget? _actions() {
     final form = widget.form;
     final app = AppScope.of(context);
-    Widget action(IconData icon, String label, VoidCallback onPressed) =>
-        TextButton.icon(
-          onPressed: onPressed,
-          style: TextButton.styleFrom(
-            visualDensity: VisualDensity.compact,
-            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          ),
-          icon: Icon(icon, size: 16),
-          label: Text(label, style: const TextStyle(fontSize: 12)),
-        );
+    Widget action(
+      IconData icon,
+      String label,
+      void Function(BuildContext button) onPressed,
+    ) => Builder(
+      builder: (button) => TextButton.icon(
+        onPressed: () => onPressed(button),
+        style: TextButton.styleFrom(
+          visualDensity: VisualDensity.compact,
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        ),
+        icon: Icon(icon, size: 16),
+        label: Text(label, style: const TextStyle(fontSize: 12)),
+      ),
+    );
     final actions = [
       if (form.isOpen && !app.members.every(form.recipients.contains))
-        action(Icons.person_add_alt, '新增填寫人員', _addRecipients),
+        action(Icons.person_add_alt, '新增填寫人員', (_) => _addRecipients()),
       if (form.canExtendDeadline)
-        action(Icons.event_outlined, '延長截止日', _extendDeadline),
-      if (form.isPublished)
-        action(Icons.lock_outline, '結案', _close),
+        action(Icons.event_outlined, '延長截止日', (_) => _extendDeadline()),
+      if (form.isPublished) action(Icons.lock_outline, '結案', (_) => _close()),
+      if (form.responses.isNotEmpty)
+        action(Icons.file_download_outlined, '匯出 CSV', _exportCsv),
     ];
     if (actions.isEmpty) return null;
     return Wrap(spacing: 4, runSpacing: 4, children: actions);
@@ -540,15 +586,15 @@ class _RecipientListState extends State<_RecipientList> {
       for (final m in form.recipients)
         if (form.hasResponded(m)) m,
     ];
-    final people = _waiting ? waiting : responded;
+    final people = _view == _View.waiting ? waiting : responded;
 
-    Widget toggle(String label, bool forWaiting, Color bg, Color fg) {
-      final on = _waiting == forWaiting;
+    Widget toggle(String label, _View view, Color bg, Color fg) {
+      final on = _view == view;
       // Background, border and text color share one timing so nothing
       // flashes; the weight stays fixed so the pill doesn't change width.
       const duration = Duration(milliseconds: 180);
       return GestureDetector(
-        onTap: () => setState(() => _waiting = forWaiting),
+        onTap: () => setState(() => _view = view),
         child: AnimatedContainer(
           duration: duration,
           curve: Curves.easeOutCubic,
@@ -578,40 +624,51 @@ class _RecipientListState extends State<_RecipientList> {
       children: [
         if (actions != null) ...[
           actions,
-          const Divider(height: 16, color: AppColors.muted),
+          Divider(height: 16, color: context.colors.muted),
         ],
         Row(
           children: [
             toggle(
               '未回覆 ${waiting.length}',
-              true,
-              AppColors.accentSoft,
-              AppColors.accent,
+              _View.waiting,
+              context.colors.accentSoft,
+              context.colors.accent,
             ),
             const SizedBox(width: 6),
             toggle(
               '已回覆 ${responded.length}',
-              false,
-              AppColors.successSoft,
-              AppColors.success,
+              _View.responded,
+              context.colors.successSoft,
+              context.colors.success,
+            ),
+            const SizedBox(width: 6),
+            toggle(
+              '統計',
+              _View.stats,
+              context.colors.primarySoft,
+              context.colors.primaryDeep,
             ),
           ],
         ),
         const SizedBox(height: 6),
-        if (people.isEmpty)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            child: Center(
-              child: Text(
-                _waiting ? '所有人都回覆了' : '還沒有人回覆',
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: AppColors.mutedForeground,
+        if (_view == _View.stats)
+          ResponseStats(widget.form)
+        else ...[
+          if (people.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              child: Center(
+                child: Text(
+                  _view == _View.waiting ? '所有人都回覆了' : '還沒有人回覆',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: context.colors.mutedForeground,
+                  ),
                 ),
               ),
             ),
-          ),
-        for (final m in people) _row(m),
+          for (final m in people) _row(m),
+        ],
       ],
     );
   }
