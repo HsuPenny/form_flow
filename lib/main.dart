@@ -7,6 +7,7 @@ import 'data/api/api_client.dart';
 import 'data/app_state.dart';
 import 'data/repositories/supabase_auth_repository.dart';
 import 'data/repositories/supabase_form_repository.dart';
+import 'data/theme_mode_store.dart';
 import 'pages/login_page.dart';
 import 'pages/shell.dart';
 import 'pages/splash_page.dart';
@@ -45,9 +46,13 @@ Future<void> main() async {
     return;
   }
   final api = SupabaseApi(url: supabaseUrl, key: supabaseKey);
+  // Read before the first frame so a dark-mode user never sees a light flash.
+  final themeStore = PrefsThemeModeStore();
   final state = AppState(
     auth: SupabaseAuthRepository(api),
     forms: SupabaseFormRepository(api.dio),
+    themeStore: themeStore,
+    themeMode: await themeStore.load(),
   );
   // Not awaited: the app draws right away and shows the backdrop until the
   // saved session (if any) is restored.
@@ -64,11 +69,26 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return AppScope(
       state: state,
-      child: MaterialApp(
-        title: 'Formfield 表單中心',
-        debugShowCheckedModeBanner: false,
-        theme: buildAppTheme(),
-        home: const _Root(),
+      // Rebuilds only the MaterialApp when the theme mode changes.
+      child: ListenableBuilder(
+        listenable: state,
+        builder: (context, child) => MaterialApp(
+          title: 'Formfield 表單中心',
+          debugShowCheckedModeBanner: false,
+          theme: buildAppTheme(),
+          darkTheme: buildAppTheme(Brightness.dark),
+          themeMode: state.themeMode,
+          // Status bar icons follow the theme in use, which may differ from
+          // the system's when the user picked 淺色 / 深色 in settings.
+          builder: (context, child) => AnnotatedRegion<SystemUiOverlayStyle>(
+            value: Theme.of(context).brightness == Brightness.dark
+                ? SystemUiOverlayStyle.light
+                : SystemUiOverlayStyle.dark,
+            child: child!,
+          ),
+          home: child,
+        ),
+        child: const _Root(),
       ),
     );
   }

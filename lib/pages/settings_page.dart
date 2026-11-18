@@ -13,6 +13,13 @@ class SettingsPage extends StatefulWidget {
   State<SettingsPage> createState() => _SettingsPageState();
 }
 
+/// Options of the 外觀 switch, in display order.
+const _themeModes = [
+  (ThemeMode.system, '跟隨系統'),
+  (ThemeMode.light, '淺色'),
+  (ThemeMode.dark, '深色'),
+];
+
 class _SettingsPageState extends State<SettingsPage> {
   late final AppState _app = AppScope.of(context);
   late final _name = TextEditingController(text: _app.displayName);
@@ -112,6 +119,33 @@ class _SettingsPageState extends State<SettingsPage> {
     );
 
     final otherGroups = [
+      _SettingsGroup(
+        title: '外觀',
+        child: Column(
+          children: [
+            const _SettingsRow(
+              icon: BrandGlyph.moon,
+              tone: _Tone.gray,
+              title: '主題',
+              subtitle: '只套用在這台裝置',
+              trailing: SizedBox.shrink(),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+              child: SizedBox(
+                width: double.infinity,
+                child: SegmentedTabs(
+                  labels: [for (final m in _themeModes) m.$2],
+                  selected: _themeModes.indexWhere(
+                    (m) => m.$1 == app.themeMode,
+                  ),
+                  onChanged: (i) => app.setThemeMode(_themeModes[i].$1),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
       _SettingsGroup(
         title: '通知',
         rows: [

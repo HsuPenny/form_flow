@@ -1,22 +1,48 @@
 import 'dart:collection';
 
+import 'package:flutter/material.dart' show ThemeMode;
 import 'package:flutter/widgets.dart';
 
 import 'models.dart';
 import 'repositories/auth_repository.dart';
 import 'repositories/form_repository.dart';
+import 'theme_mode_store.dart';
 
 /// App-wide view state. Reads and writes go through the repositories; this
 /// class keeps the latest results so widgets can read them synchronously.
 ///
 /// Write methods throw when the backend rejects them; callers show the error.
 class AppState extends ChangeNotifier {
-  AppState({required AuthRepository auth, required FormRepository forms})
-    : _auth = auth,
-      _formRepo = forms;
+  AppState({
+    required AuthRepository auth,
+    required FormRepository forms,
+    ThemeModeStore? themeStore,
+    ThemeMode themeMode = ThemeMode.system,
+  }) : _auth = auth,
+       _formRepo = forms,
+       _themeStore = themeStore ?? MemoryThemeModeStore(),
+       _themeMode = themeMode;
 
   final AuthRepository _auth;
   final FormRepository _formRepo;
+  final ThemeModeStore _themeStore;
+  ThemeMode _themeMode;
+
+  /// 淺色 / 深色 / 跟隨系統. Device-local, so it survives logging out.
+  ThemeMode get themeMode => _themeMode;
+
+  /// Applies right away; a failed save only means the choice is forgotten on
+  /// the next launch, so it is logged instead of thrown.
+  Future<void> setThemeMode(ThemeMode mode) async {
+    if (mode == _themeMode) return;
+    _themeMode = mode;
+    notifyListeners();
+    try {
+      await _themeStore.save(mode);
+    } catch (e) {
+      debugPrint('Could not save theme mode: $e');
+    }
+  }
 
   bool _signedIn = false;
   bool _restoring = false;
