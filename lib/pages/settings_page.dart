@@ -145,10 +145,10 @@ class _SettingsPageState extends State<SettingsPage> {
             tone: _Tone.gray,
             title: '修改密碼',
             subtitle: '更新登入用的密碼',
-            trailing: const Icon(
+            trailing: Icon(
               Icons.chevron_right,
               size: 20,
-              color: AppColors.mutedForeground,
+              color: context.colors.mutedForeground,
             ),
             onTap: _changePassword,
           ),
@@ -171,7 +171,7 @@ class _SettingsPageState extends State<SettingsPage> {
           _SettingsRow.centered(
             icon: BrandGlyph.logout,
             title: '登出工作區',
-            color: AppColors.destructive,
+            color: context.colors.destructive,
             onTap: app.logout,
           ),
         ],
@@ -243,16 +243,16 @@ class _ProfileBanner extends StatelessWidget {
                 width: wide ? 56 : 48,
                 height: wide ? 56 : 48,
                 alignment: Alignment.center,
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.white,
+                  color: context.colors.card,
                 ),
                 child: Text(
                   app.initials,
                   style: TextStyle(
                     fontSize: wide ? 18 : 16,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.primaryDeep,
+                    color: context.colors.primaryDeep,
                   ),
                 ),
               ),
@@ -317,10 +317,10 @@ class _SettingsGroup extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(6, 16, 6, 8),
             child: Text(
               title!,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
-                color: AppColors.mutedForeground,
+                color: context.colors.mutedForeground,
               ),
             ),
           )
@@ -330,9 +330,9 @@ class _SettingsGroup extends StatelessWidget {
           width: double.infinity,
           clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
-            color: AppColors.card,
+            color: context.colors.card,
             borderRadius: BorderRadius.circular(AppRadius.base),
-            border: Border.all(color: AppColors.border),
+            border: Border.all(color: context.colors.border),
           ),
           child:
               child ??
@@ -340,10 +340,10 @@ class _SettingsGroup extends StatelessWidget {
                 children: [
                   for (var i = 0; i < rows!.length; i++) ...[
                     if (i > 0)
-                      const Divider(
+                      Divider(
                         height: 1,
                         indent: 56,
-                        color: AppColors.muted,
+                        color: context.colors.muted,
                       ),
                     rows![i],
                   ],
@@ -415,10 +415,10 @@ class _SettingsRow extends StatelessWidget {
     }
 
     final (bg, fg) = switch (tone) {
-      _Tone.orange => (AppColors.primarySoft, AppColors.primaryDeep),
-      _Tone.blue => (AppColors.accentSoft, AppColors.accent),
-      _Tone.green => (AppColors.successSoft, AppColors.success),
-      _Tone.gray => (AppColors.muted, AppColors.mutedForeground),
+      _Tone.orange => (context.colors.primarySoft, context.colors.primaryDeep),
+      _Tone.blue => (context.colors.accentSoft, context.colors.accent),
+      _Tone.green => (context.colors.successSoft, context.colors.success),
+      _Tone.gray => (context.colors.muted, context.colors.mutedForeground),
     };
     return InkWell(
       onTap: onTap,
@@ -452,9 +452,9 @@ class _SettingsRow extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       subtitle!,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
-                        color: AppColors.mutedForeground,
+                        color: context.colors.mutedForeground,
                       ),
                     ),
                   ],
@@ -537,7 +537,7 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
   Widget build(BuildContext context) {
     final error = _error;
     return AlertDialog(
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.card,
       title: const Text('修改密碼', style: TextStyle(fontSize: 18)),
       content: SizedBox(
         width: 360,

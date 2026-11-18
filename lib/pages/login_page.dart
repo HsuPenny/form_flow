@@ -368,7 +368,7 @@ class _LoginPageState extends State<LoginPage>
       child: Container(
         padding: const EdgeInsets.all(22),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: context.colors.card,
           borderRadius: BorderRadius.circular(AppRadius.base + 4),
           boxShadow: [
             BoxShadow(
@@ -423,12 +423,12 @@ class _LoginPageState extends State<LoginPage>
                 child: InkWell(
                   onTap: _busy ? null : _forgotPassword,
                   borderRadius: BorderRadius.circular(4),
-                  child: const Text(
+                  child: Text(
                     '忘記密碼？',
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
-                      color: AppColors.primaryDeep,
+                      color: context.colors.primaryDeep,
                     ),
                   ),
                 ),

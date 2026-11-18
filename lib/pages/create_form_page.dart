@@ -25,13 +25,15 @@ class _CreateFormPageState extends State<CreateFormPage> {
   // Step 1
   late final _title = TextEditingController(text: widget.draft?.title);
   late final _desc = TextEditingController(text: widget.draft?.description);
-  late DateTime _deadline = widget.draft?.deadline ?? _today().add(_defaultTerm);
+  late DateTime _deadline =
+      widget.draft?.deadline ?? _today().add(_defaultTerm);
   static const _defaultTerm = Duration(days: 7);
 
   static DateTime _today() {
     final now = DateTime.now();
     return DateTime(now.year, now.month, now.day);
   }
+
   late List<Member> _recipients = widget.draft != null
       ? [...widget.draft!.recipients]
       : AppScope.of(context).members.take(3).toList();
@@ -232,9 +234,7 @@ class _CreateFormPageState extends State<CreateFormPage> {
           label: const Text('儲存草稿'),
         ),
         FilledButton.icon(
-          onPressed: _finalRecipients.isEmpty
-              ? null
-              : _publish,
+          onPressed: _finalRecipients.isEmpty ? null : _publish,
           icon: const Icon(Icons.send_outlined, size: 16),
           label: const Text('立即發佈'),
         ),
@@ -242,9 +242,9 @@ class _CreateFormPageState extends State<CreateFormPage> {
     };
 
     return Container(
-      decoration: const BoxDecoration(
-        color: AppColors.card,
-        border: Border(top: BorderSide(color: AppColors.border)),
+      decoration: BoxDecoration(
+        color: context.colors.card,
+        border: Border(top: BorderSide(color: context.colors.border)),
       ),
       child: SafeArea(
         top: false,
@@ -374,24 +374,24 @@ class _CreateFormPageState extends State<CreateFormPage> {
           const SizedBox(height: 10),
         ],
         _DashedBox(
-          color: AppColors.primary.withValues(alpha: 0.55),
+          color: context.colors.primary.withValues(alpha: 0.55),
           onTap: () => setState(() {
             _questions.add(Question());
             _editing = _questions.length - 1;
           }),
-          child: const Padding(
+          child: Padding(
             padding: EdgeInsets.symmetric(vertical: 14),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.add, size: 18, color: AppColors.primaryDeep),
+                Icon(Icons.add, size: 18, color: context.colors.primaryDeep),
                 SizedBox(width: 6),
                 Text(
                   '新增問題',
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
-                    color: AppColors.primaryDeep,
+                    color: context.colors.primaryDeep,
                   ),
                 ),
               ],
@@ -411,18 +411,18 @@ class _CreateFormPageState extends State<CreateFormPage> {
       child: Container(
         padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
         decoration: BoxDecoration(
-          color: AppColors.card,
+          color: context.colors.card,
           borderRadius: BorderRadius.circular(AppRadius.sm),
-          border: Border.all(color: AppColors.border),
+          border: Border.all(color: context.colors.border),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               label,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 11,
-                color: AppColors.mutedForeground,
+                color: context.colors.mutedForeground,
               ),
             ),
             const SizedBox(height: 2),
@@ -454,20 +454,20 @@ class _CreateFormPageState extends State<CreateFormPage> {
         const SizedBox(height: 14),
         Row(
           children: [
-            const Expanded(
+            Expanded(
               child: Text(
                 '填寫者會看到的樣子',
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
-                  color: AppColors.mutedForeground,
+                  color: context.colors.mutedForeground,
                 ),
               ),
             ),
             TextButton.icon(
               onPressed: () => setState(() => _step = 1),
               style: TextButton.styleFrom(
-                foregroundColor: AppColors.primaryDeep,
+                foregroundColor: context.colors.primaryDeep,
               ),
               icon: const Icon(Icons.edit_outlined, size: 16),
               label: const Text('編輯問題'),
@@ -476,8 +476,8 @@ class _CreateFormPageState extends State<CreateFormPage> {
         ),
         const SizedBox(height: 4),
         _DashedBox(
-          color: AppColors.input,
-          fill: AppColors.card,
+          color: context.colors.input,
+          fill: context.colors.card,
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -669,20 +669,20 @@ class _QuestionEditorState extends State<_QuestionEditor> {
   Widget _optionMarker(int i) => SizedBox(
     width: 22,
     child: switch (q.type) {
-      QuestionType.multiple => const Icon(
+      QuestionType.multiple => Icon(
         Icons.check_box_outline_blank,
         size: 18,
-        color: AppColors.input,
+        color: context.colors.input,
       ),
       QuestionType.dropdown => Text(
         '${i + 1}.',
         textAlign: TextAlign.center,
-        style: const TextStyle(fontSize: 13, color: AppColors.mutedForeground),
+        style: TextStyle(fontSize: 13, color: context.colors.mutedForeground),
       ),
-      _ => const Icon(
+      _ => Icon(
         Icons.radio_button_unchecked,
         size: 18,
-        color: AppColors.input,
+        color: context.colors.input,
       ),
     },
   );
@@ -729,9 +729,9 @@ class _QuestionEditorState extends State<_QuestionEditor> {
                       else
                         Text(
                           '${q.type.label} · ${q.required ? '必填' : '選填'}',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 10,
-                            color: AppColors.mutedForeground,
+                            color: context.colors.mutedForeground,
                           ),
                         ),
                     ],
@@ -741,16 +741,16 @@ class _QuestionEditorState extends State<_QuestionEditor> {
                   IconButton(
                     tooltip: '刪除問題',
                     onPressed: widget.onDelete,
-                    icon: const Icon(
+                    icon: Icon(
                       Icons.delete_outline,
                       size: 18,
-                      color: AppColors.destructive,
+                      color: context.colors.destructive,
                     ),
                   ),
                 Icon(
                   widget.expanded ? Icons.expand_less : Icons.expand_more,
                   size: 20,
-                  color: AppColors.mutedForeground,
+                  color: context.colors.mutedForeground,
                 ),
               ],
             ),
@@ -801,8 +801,8 @@ class _QuestionEditorState extends State<_QuestionEditor> {
                         child: TextField(
                           controller: _options[i],
                           onChanged: (_) => _syncOptions(),
-                          decoration: const InputDecoration(
-                            fillColor: Colors.white,
+                          decoration: InputDecoration(
+                            fillColor: context.colors.card,
                           ),
                         ),
                       ),
@@ -829,16 +829,16 @@ class _QuestionEditorState extends State<_QuestionEditor> {
                     children: [
                       _optionMarker(_options.length),
                       const SizedBox(width: 10),
-                      const Expanded(
+                      Expanded(
                         child: InputDecorator(
                           decoration: InputDecoration(
-                            fillColor: AppColors.muted,
+                            fillColor: context.colors.muted,
                           ),
                           child: Text(
                             '其他…（填答者可自行輸入）',
                             style: TextStyle(
                               fontSize: 13,
-                              color: AppColors.mutedForeground,
+                              color: context.colors.mutedForeground,
                             ),
                           ),
                         ),
@@ -874,7 +874,7 @@ class _QuestionEditorState extends State<_QuestionEditor> {
                         widget.onChanged();
                       },
                       style: TextButton.styleFrom(
-                        foregroundColor: AppColors.primaryDeep,
+                        foregroundColor: context.colors.primaryDeep,
                       ),
                       child: const Text('新增「其他」'),
                     ),
@@ -882,7 +882,7 @@ class _QuestionEditorState extends State<_QuestionEditor> {
               ),
             ],
             const SizedBox(height: 6),
-            const Divider(height: 1, color: AppColors.muted),
+            Divider(height: 1, color: context.colors.muted),
             Padding(
               padding: const EdgeInsets.only(top: 12),
               child: Row(
@@ -935,7 +935,7 @@ class _TypePicker extends StatelessWidget {
                 if (i > start) const SizedBox(width: 6),
                 Expanded(
                   child: i < types.length
-                      ? _tile(types[i])
+                      ? _tile(context, types[i])
                       : const SizedBox.shrink(),
                 ),
               ],
@@ -946,11 +946,11 @@ class _TypePicker extends StatelessWidget {
     );
   }
 
-  Widget _tile(QuestionType t) {
+  Widget _tile(BuildContext context, QuestionType t) {
     final on = t == value;
-    final fg = on ? AppColors.primaryDeep : AppColors.mutedForeground;
+    final fg = on ? context.colors.primaryDeep : context.colors.mutedForeground;
     return Material(
-      color: on ? AppColors.primarySoft : AppColors.card,
+      color: on ? context.colors.primarySoft : context.colors.card,
       borderRadius: BorderRadius.circular(AppRadius.sm),
       child: InkWell(
         borderRadius: BorderRadius.circular(AppRadius.sm),
@@ -960,7 +960,7 @@ class _TypePicker extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(AppRadius.sm),
             border: Border.all(
-              color: on ? AppColors.primary : AppColors.border,
+              color: on ? context.colors.primary : context.colors.border,
             ),
           ),
           child: Column(
@@ -1002,19 +1002,19 @@ class _TypeHint extends StatelessWidget {
       margin: const EdgeInsets.only(left: 6, top: 4, bottom: 4),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: AppColors.muted,
+        color: context.colors.muted,
         borderRadius: BorderRadius.circular(AppRadius.sm),
       ),
       child: Row(
         children: [
-          Icon(type.icon, size: 18, color: AppColors.mutedForeground),
+          Icon(type.icon, size: 18, color: context.colors.mutedForeground),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               text,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 12,
-                color: AppColors.mutedForeground,
+                color: context.colors.mutedForeground,
               ),
             ),
           ),

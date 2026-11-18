@@ -27,9 +27,7 @@ class _OverviewPageState extends State<OverviewPage> {
     final me = app.me;
     FormStatus statusOf(FormItem f) => f.statusFor(me);
     final visible = app.forms
-        .where(
-          (f) => f.status != FormStatus.draft && f.recipients.contains(me),
-        )
+        .where((f) => f.status != FormStatus.draft && f.recipients.contains(me))
         .toList();
     final completed = visible
         .where((f) => statusOf(f) == FormStatus.completed)
@@ -160,9 +158,9 @@ class _FormCard extends StatelessWidget {
               form.description,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 12,
-                color: AppColors.mutedForeground,
+                color: context.colors.mutedForeground,
               ),
             ),
           ],
@@ -203,11 +201,13 @@ class _MetaChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final fg = highlighted ? AppColors.primaryDeep : AppColors.mutedForeground;
+    final fg = highlighted
+        ? context.colors.primaryDeep
+        : context.colors.mutedForeground;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: highlighted ? AppColors.primarySoft : AppColors.muted,
+        color: highlighted ? context.colors.primarySoft : context.colors.muted,
         borderRadius: BorderRadius.circular(999),
       ),
       child: Row(
@@ -234,16 +234,19 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const AppCard(
+    return AppCard(
       padding: EdgeInsets.symmetric(vertical: 48),
       child: Center(
         child: Column(
           children: [
-            Icon(Icons.inbox_outlined, color: AppColors.mutedForeground),
+            Icon(Icons.inbox_outlined, color: context.colors.mutedForeground),
             SizedBox(height: 8),
             Text(
               '這裡目前沒有表單',
-              style: TextStyle(color: AppColors.mutedForeground, fontSize: 13),
+              style: TextStyle(
+                color: context.colors.mutedForeground,
+                fontSize: 13,
+              ),
             ),
           ],
         ),

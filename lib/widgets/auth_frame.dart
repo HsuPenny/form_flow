@@ -26,7 +26,7 @@ class AuthFrame extends StatelessWidget {
                   children: [
                     const LogoMark(size: 56, bare: true),
                     const SizedBox(height: 24),
-                    _card(),
+                    _card(context),
                   ],
                 ),
               ),
@@ -53,14 +53,14 @@ class AuthFrame extends StatelessWidget {
     );
   }
 
-  Widget _card() {
+  Widget _card(BuildContext context) {
     return ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 420),
       child: Container(
         width: double.infinity,
         padding: const EdgeInsets.all(22),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: context.colors.card,
           borderRadius: BorderRadius.circular(AppRadius.base + 4),
           boxShadow: [
             BoxShadow(
@@ -99,10 +99,10 @@ class AuthHeading extends StatelessWidget {
         const SizedBox(height: 6),
         Text(
           subtitle,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 13,
             height: 1.6,
-            color: AppColors.mutedForeground,
+            color: context.colors.mutedForeground,
           ),
         ),
       ],

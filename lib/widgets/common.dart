@@ -152,9 +152,9 @@ class BrandHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Row(
+    return Row(
       children: [
-        LogoMark(size: 32, bare: true, color: AppColors.primary),
+        LogoMark(size: 32, bare: true, color: context.colors.primary),
         SizedBox(width: 12),
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -165,7 +165,10 @@ class BrandHeader extends StatelessWidget {
             ),
             Text(
               '團隊表單中心',
-              style: TextStyle(fontSize: 10, color: AppColors.mutedForeground),
+              style: TextStyle(
+                fontSize: 10,
+                color: context.colors.mutedForeground,
+              ),
             ),
           ],
         ),
@@ -184,7 +187,7 @@ class Eyebrow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       text.toUpperCase(),
-      style: AppText.eyebrow.copyWith(color: color),
+      style: AppText.eyebrow(context.colors).copyWith(color: color),
     );
   }
 }
@@ -211,7 +214,7 @@ class AppCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final radius = BorderRadius.circular(AppRadius.base);
     return Material(
-      color: AppColors.card,
+      color: context.colors.card,
       borderRadius: radius,
       child: InkWell(
         borderRadius: radius,
@@ -222,15 +225,15 @@ class AppCard extends StatelessWidget {
             borderRadius: radius,
             border: Border.all(
               color: error
-                  ? AppColors.destructive
+                  ? context.colors.destructive
                   : highlighted
-                  ? AppColors.primary
-                  : AppColors.border,
+                  ? context.colors.primary
+                  : context.colors.border,
               width: error ? 1.5 : (highlighted ? 1.3 : 1),
             ),
             boxShadow: [
               BoxShadow(
-                color: AppColors.foreground.withValues(alpha: 0.04),
+                color: Colors.black.withValues(alpha: 0.04),
                 blurRadius: 12,
                 offset: const Offset(0, 4),
               ),
@@ -260,7 +263,7 @@ class FieldError extends StatelessWidget {
         Icon(
           Icons.error_outline,
           size: fontSize + 2,
-          color: AppColors.destructive,
+          color: context.colors.destructive,
         ),
         const SizedBox(width: 4),
         Flexible(
@@ -269,7 +272,7 @@ class FieldError extends StatelessWidget {
             style: TextStyle(
               fontSize: fontSize,
               fontWeight: FontWeight.w500,
-              color: AppColors.destructive,
+              color: context.colors.destructive,
             ),
           ),
         ),
@@ -365,8 +368,8 @@ class PageHeader extends StatelessWidget {
           const SizedBox(width: 16),
           FilledButton.icon(
             style: FilledButton.styleFrom(
-              backgroundColor: Colors.white,
-              foregroundColor: AppColors.primaryDeep,
+              backgroundColor: context.colors.card,
+              foregroundColor: context.colors.primaryDeep,
             ),
             onPressed: action!.onPressed,
             icon: Icon(action!.icon, size: 18),
@@ -434,7 +437,7 @@ class BrandBanner extends StatelessWidget {
     return Container(
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
-        gradient: AppGradients.brand,
+        gradient: context.colors.brandGradient,
         borderRadius: BorderRadius.circular(AppRadius.base),
       ),
       child: Stack(
@@ -496,7 +499,7 @@ class BrandBackdrop extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DecoratedBox(
-      decoration: const BoxDecoration(gradient: AppGradients.brand),
+      decoration: BoxDecoration(gradient: context.colors.brandGradient),
       child: CustomPaint(painter: _BackdropPainter(waves, decor)),
     );
   }
@@ -670,7 +673,7 @@ class AppDropdownField<T> extends StatelessWidget {
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.card,
       constraints: const BoxConstraints(maxWidth: 560),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -701,11 +704,11 @@ class AppDropdownField<T> extends StatelessWidget {
           hintText: hint,
           prefixIcon: icon == null
               ? null
-              : Icon(icon, size: 18, color: AppColors.mutedForeground),
+              : Icon(icon, size: 18, color: context.colors.mutedForeground),
           prefixIconConstraints: const BoxConstraints(minWidth: 38),
-          suffixIcon: const Icon(
+          suffixIcon: Icon(
             Icons.keyboard_arrow_down,
-            color: AppColors.mutedForeground,
+            color: context.colors.mutedForeground,
           ),
           suffixIconConstraints: const BoxConstraints(minWidth: 40),
         ),
@@ -746,7 +749,7 @@ class _SelectSheet extends StatelessWidget {
             width: 36,
             height: 4,
             decoration: BoxDecoration(
-              color: AppColors.input,
+              color: context.colors.input,
               borderRadius: BorderRadius.circular(999),
             ),
           ),
@@ -777,8 +780,8 @@ class _SelectSheet extends StatelessWidget {
                 return ListTile(
                   dense: true,
                   selected: isSelected,
-                  selectedColor: AppColors.primaryDeep,
-                  selectedTileColor: AppColors.primarySoft,
+                  selectedColor: context.colors.primaryDeep,
+                  selectedTileColor: context.colors.primarySoft,
                   title: Text(
                     labels[i],
                     maxLines: 1,
@@ -854,13 +857,16 @@ class StatusBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (bg, fg) = switch (tone) {
-      BadgeTone.primary => (AppColors.primarySoft, AppColors.primaryDeep),
-      BadgeTone.success => (AppColors.successSoft, AppColors.success),
-      BadgeTone.accent => (AppColors.accentSoft, AppColors.accent),
-      BadgeTone.muted => (AppColors.muted, AppColors.mutedForeground),
+      BadgeTone.primary => (
+        context.colors.primarySoft,
+        context.colors.primaryDeep,
+      ),
+      BadgeTone.success => (context.colors.successSoft, context.colors.success),
+      BadgeTone.accent => (context.colors.accentSoft, context.colors.accent),
+      BadgeTone.muted => (context.colors.muted, context.colors.mutedForeground),
       BadgeTone.destructive => (
-        AppColors.destructiveSoft,
-        AppColors.destructive,
+        context.colors.destructiveSoft,
+        context.colors.destructive,
       ),
     };
     return Container(
@@ -892,14 +898,16 @@ class Avatar extends StatelessWidget {
       alignment: Alignment.center,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: dimmed ? AppColors.muted : AppColors.primarySoft,
+        color: dimmed ? context.colors.muted : context.colors.primarySoft,
       ),
       child: Text(
         initials,
         style: TextStyle(
           fontSize: size * 0.32,
           fontWeight: FontWeight.w700,
-          color: dimmed ? AppColors.mutedForeground : AppColors.primaryDeep,
+          color: dimmed
+              ? context.colors.mutedForeground
+              : context.colors.primaryDeep,
         ),
       ),
     );
@@ -911,7 +919,7 @@ const _tabCurve = Curves.easeOutCubic;
 
 /// Pill-style segmented control (全部 / 已完成 / 待完成, 完成進度 / 最新回覆).
 ///
-/// Items share one width so a single white indicator can slide between them;
+/// Items share one width so a single indicator pill can slide between them;
 /// text and badge colors animate on the same timing, so nothing flickers.
 class SegmentedTabs extends StatelessWidget {
   const SegmentedTabs({
@@ -933,9 +941,9 @@ class SegmentedTabs extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: AppColors.muted,
+        color: context.colors.tabTrack,
         borderRadius: BorderRadius.circular(AppRadius.sm),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: context.colors.border),
       ),
       child: IntrinsicWidth(
         child: Stack(
@@ -953,11 +961,11 @@ class SegmentedTabs extends StatelessWidget {
                   heightFactor: 1,
                   child: DecoratedBox(
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: context.colors.tabIndicator,
                       borderRadius: BorderRadius.circular(8),
                       boxShadow: [
                         BoxShadow(
-                          color: AppColors.foreground.withValues(alpha: 0.08),
+                          color: Colors.black.withValues(alpha: 0.08),
                           blurRadius: 4,
                           offset: const Offset(0, 1),
                         ),
@@ -996,8 +1004,8 @@ class SegmentedTabs extends StatelessWidget {
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
                 color: active
-                    ? AppColors.foreground
-                    : AppColors.mutedForeground,
+                    ? context.colors.foreground
+                    : context.colors.mutedForeground,
               ),
               child: Text(labels[i]),
             ),
@@ -1008,7 +1016,9 @@ class SegmentedTabs extends StatelessWidget {
                 curve: _tabCurve,
                 padding: const EdgeInsets.fromLTRB(6, 1, 6, 3),
                 decoration: BoxDecoration(
-                  color: active ? AppColors.primarySoft : AppColors.secondary,
+                  color: active
+                      ? context.colors.primarySoft
+                      : context.colors.secondary,
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: AnimatedDefaultTextStyle(
@@ -1017,8 +1027,8 @@ class SegmentedTabs extends StatelessWidget {
                   style: base.copyWith(
                     fontSize: 10,
                     color: active
-                        ? AppColors.primaryDeep
-                        : AppColors.mutedForeground,
+                        ? context.colors.primaryDeep
+                        : context.colors.mutedForeground,
                   ),
                   child: Text('${counts![i]}'),
                 ),
@@ -1086,7 +1096,7 @@ class _PasswordFieldState extends State<PasswordField> {
         suffixIcon: IconButton(
           onPressed: () => setState(() => _visible = !_visible),
           tooltip: _visible ? '隱藏密碼' : '顯示密碼',
-          color: AppColors.mutedForeground,
+          color: context.colors.mutedForeground,
           iconSize: 18,
           icon: Icon(
             _visible
@@ -1110,14 +1120,14 @@ class NumberChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
       decoration: BoxDecoration(
-        color: AppColors.primarySoft,
+        color: context.colors.primarySoft,
         borderRadius: BorderRadius.circular(6),
       ),
       child: Text(
         (index + 1).toString().padLeft(2, '0'),
         style: AppText.mono.copyWith(
           fontSize: 10,
-          color: AppColors.primaryDeep,
+          color: context.colors.primaryDeep,
         ),
       ),
     );
@@ -1292,16 +1302,20 @@ class _PullToRefreshFrameState extends State<_PullToRefreshFrame>
                           painter: _SparkleRowPainter(
                             shown: shown,
                             loop: _loop.value,
+                            colors: [
+                              context.colors.primary,
+                              context.colors.primaryDark,
+                            ],
                           ),
                         ),
                       ),
                       const SizedBox(height: 6),
                       Text(
                         label,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
-                          color: AppColors.mutedForeground,
+                          color: context.colors.mutedForeground,
                         ),
                       ),
                     ],
@@ -1317,9 +1331,16 @@ class _PullToRefreshFrameState extends State<_PullToRefreshFrame>
 
 /// A row of sparkles, popped in up to [shown] (0–1) and hopping with [loop].
 class _SparkleRowPainter extends CustomPainter {
-  const _SparkleRowPainter({required this.shown, required this.loop});
+  const _SparkleRowPainter({
+    required this.shown,
+    required this.loop,
+    required this.colors,
+  });
 
   final double shown;
+
+  /// Alternating sparkle colors.
+  final List<Color> colors;
   final double loop;
 
   /// Radius of each sparkle, big and small in turn like the logo's pair.
@@ -1329,7 +1350,6 @@ class _SparkleRowPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final colors = [AppColors.primary, AppColors.primaryDark];
     final baseline = size.height - 9;
 
     for (var i = 0; i < _radii.length; i++) {
@@ -1359,7 +1379,7 @@ class _SparkleRowPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_SparkleRowPainter old) =>
-      old.shown != shown || old.loop != loop;
+      old.shown != shown || old.loop != loop || old.colors != colors;
 }
 
 /// [tabs] with a 搜尋表單名稱 box: beside them on wide screens, behind a
@@ -1397,9 +1417,9 @@ class _TabsWithSearchState extends State<TabsWithSearch> {
         controller: _search,
         autofocus: !wide,
         onChanged: widget.onQueryChanged,
-        decoration: const InputDecoration(
+        decoration: InputDecoration(
           hintText: '搜尋表單名稱',
-          fillColor: Colors.white,
+          fillColor: context.colors.card,
           prefixIcon: Icon(Icons.search, size: 18),
           prefixIconConstraints: BoxConstraints(minWidth: 36),
         ),
@@ -1408,7 +1428,7 @@ class _TabsWithSearchState extends State<TabsWithSearch> {
     if (wide) return Row(children: [widget.tabs, const Spacer(), search]);
 
     final searchToggle = Material(
-      color: _searchOpen ? AppColors.primarySoft : AppColors.card,
+      color: _searchOpen ? context.colors.primarySoft : context.colors.card,
       borderRadius: BorderRadius.circular(AppRadius.sm),
       child: InkWell(
         borderRadius: BorderRadius.circular(AppRadius.sm),
@@ -1425,13 +1445,17 @@ class _TabsWithSearchState extends State<TabsWithSearch> {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(AppRadius.sm),
             border: Border.all(
-              color: _searchOpen ? AppColors.primary : AppColors.border,
+              color: _searchOpen
+                  ? context.colors.primary
+                  : context.colors.border,
             ),
           ),
           child: Icon(
             _searchOpen ? Icons.close : Icons.search,
             size: 18,
-            color: _searchOpen ? AppColors.primaryDeep : AppColors.foreground,
+            color: _searchOpen
+                ? context.colors.primaryDeep
+                : context.colors.foreground,
           ),
         ),
       ),

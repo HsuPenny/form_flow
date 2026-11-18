@@ -119,10 +119,10 @@ class _CodeInputState extends State<CodeInput> {
         duration: const Duration(milliseconds: 120),
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: context.colors.card,
           borderRadius: BorderRadius.circular(AppRadius.sm),
           border: Border.all(
-            color: active ? AppColors.primary : AppColors.border,
+            color: active ? context.colors.primary : context.colors.border,
             width: active ? 1.5 : 1,
           ),
         ),
@@ -135,7 +135,11 @@ class _CodeInputState extends State<CodeInput> {
                 ),
               )
             : active
-            ? Container(width: 1.5, height: 24, color: AppColors.foreground)
+            ? Container(
+                width: 1.5,
+                height: 24,
+                color: context.colors.foreground,
+              )
             : null,
       ),
     );

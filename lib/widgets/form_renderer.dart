@@ -74,21 +74,21 @@ class FormHeading extends StatelessWidget {
             meta(
               Icons.schedule,
               '約 $minutes 分鐘',
-              AppColors.muted,
-              AppColors.mutedForeground,
+              context.colors.muted,
+              context.colors.mutedForeground,
             ),
             meta(
               Icons.calendar_today_outlined,
               '${formatDate(deadline)} 截止',
-              AppColors.primarySoft,
-              AppColors.primaryDeep,
+              context.colors.primarySoft,
+              context.colors.primaryDeep,
             ),
             if (recipientCount != null)
               meta(
                 Icons.group_outlined,
                 '$recipientCount 位收件人',
-                AppColors.muted,
-                AppColors.mutedForeground,
+                context.colors.muted,
+                context.colors.mutedForeground,
               ),
           ],
         ),
@@ -96,9 +96,9 @@ class FormHeading extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             description,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 13,
-              color: AppColors.mutedForeground,
+              color: context.colors.mutedForeground,
               height: 1.5,
             ),
           ),
@@ -176,9 +176,9 @@ class AnswerList extends StatelessWidget {
             margin: const EdgeInsets.only(bottom: 10),
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: AppColors.card,
+              color: context.colors.card,
               borderRadius: BorderRadius.circular(AppRadius.sm),
-              border: Border.all(color: AppColors.border),
+              border: Border.all(color: context.colors.border),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -237,10 +237,10 @@ class _QuestionCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.card,
+        color: context.colors.card,
         borderRadius: BorderRadius.circular(AppRadius.base),
         border: Border.all(
-          color: error ? AppColors.destructive : AppColors.border,
+          color: error ? context.colors.destructive : context.colors.border,
           width: error ? 1.5 : 1,
         ),
       ),
@@ -255,13 +255,13 @@ class _QuestionCard extends StatelessWidget {
                   width: 26,
                   height: 20,
                   decoration: BoxDecoration(
-                    color: AppColors.successSoft,
+                    color: context.colors.successSoft,
                     borderRadius: BorderRadius.circular(6),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.check,
                     size: 14,
-                    color: AppColors.success,
+                    color: context.colors.success,
                   ),
                 )
               else
@@ -282,8 +282,8 @@ class _QuestionCard extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 11,
                   color: question.required
-                      ? AppColors.primaryDeep
-                      : AppColors.mutedForeground,
+                      ? context.colors.primaryDeep
+                      : context.colors.mutedForeground,
                 ),
               ),
             ],
@@ -425,8 +425,8 @@ class _DateField extends StatelessWidget {
             style: TextStyle(
               fontSize: AppText.inputSize,
               color: date == null
-                  ? AppColors.mutedForeground
-                  : AppColors.foreground,
+                  ? context.colors.mutedForeground
+                  : context.colors.foreground,
             ),
           ),
         ),
@@ -470,17 +470,20 @@ class _OtherOptionState extends State<_OtherOption> {
           child: TextField(
             controller: _text,
             style: const TextStyle(fontSize: 13),
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               hintText: '請填寫',
               isDense: true,
               filled: false,
               contentPadding: EdgeInsets.symmetric(vertical: 6),
               border: UnderlineInputBorder(),
               enabledBorder: UnderlineInputBorder(
-                borderSide: BorderSide(color: AppColors.border),
+                borderSide: BorderSide(color: context.colors.border),
               ),
               focusedBorder: UnderlineInputBorder(
-                borderSide: BorderSide(color: AppColors.primary, width: 1.5),
+                borderSide: BorderSide(
+                  color: context.colors.primary,
+                  width: 1.5,
+                ),
               ),
             ),
             onChanged: (v) => widget.onChanged(OtherAnswer(v)),
@@ -532,22 +535,26 @@ class OptionTile extends StatelessWidget {
         shape: multiple ? BoxShape.rectangle : BoxShape.circle,
         borderRadius: multiple ? BorderRadius.circular(4) : null,
         // primaryDark keeps the white check and the ring >= 3:1 on white.
-        color: selected && multiple ? AppColors.primaryDark : Colors.white,
+        color: selected && multiple
+            ? context.colors.primaryDark
+            : context.colors.card,
         border: Border.all(
-          color: selected ? AppColors.primaryDark : AppColors.foreground,
+          color: selected
+              ? context.colors.primaryDark
+              : context.colors.foreground,
           width: 1.4,
         ),
       ),
       child: selected
           ? multiple
-                ? const Icon(Icons.check, size: 13, color: Colors.white)
+                ? Icon(Icons.check, size: 13, color: context.colors.card)
                 : Center(
                     child: Container(
                       width: 8,
                       height: 8,
-                      decoration: const BoxDecoration(
+                      decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: AppColors.primaryDark,
+                        color: context.colors.primaryDark,
                       ),
                     ),
                   )
@@ -563,7 +570,9 @@ class OptionTile extends StatelessWidget {
               fontFamily: AppText.sans,
               fontSize: 13,
               fontWeight: FontWeight.w500,
-              color: selected ? AppColors.primaryDeep : AppColors.foreground,
+              color: selected
+                  ? context.colors.primaryDeep
+                  : context.colors.foreground,
             ),
             child: Text(label),
           )
@@ -602,10 +611,10 @@ class OptionTile extends StatelessWidget {
             vertical: trailing == null ? 12 : 4,
           ),
           decoration: BoxDecoration(
-            color: selected ? AppColors.primarySoft : AppColors.card,
+            color: selected ? context.colors.primarySoft : context.colors.card,
             borderRadius: radius,
             border: Border.all(
-              color: selected ? AppColors.primary : AppColors.border,
+              color: selected ? context.colors.primary : context.colors.border,
               width: selected ? 1.3 : 1,
             ),
           ),

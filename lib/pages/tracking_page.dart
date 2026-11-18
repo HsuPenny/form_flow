@@ -90,12 +90,15 @@ class _TrackingPageState extends State<TrackingPage> {
 
   Widget _progressView(List<FormItem> forms) {
     if (forms.isEmpty) {
-      return const Padding(
+      return Padding(
         padding: EdgeInsets.symmetric(vertical: 40),
         child: Center(
           child: Text(
             '這裡目前沒有表單',
-            style: TextStyle(fontSize: 12, color: AppColors.mutedForeground),
+            style: TextStyle(
+              fontSize: 12,
+              color: context.colors.mutedForeground,
+            ),
           ),
         ),
       );
@@ -161,18 +164,18 @@ class _StatTiles extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
         decoration: BoxDecoration(
-          color: AppColors.card,
+          color: context.colors.card,
           borderRadius: BorderRadius.circular(AppRadius.sm),
-          border: Border.all(color: AppColors.border),
+          border: Border.all(color: context.colors.border),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               label,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 11,
-                color: AppColors.mutedForeground,
+                color: context.colors.mutedForeground,
               ),
             ),
             const SizedBox(height: 2),
@@ -191,11 +194,11 @@ class _StatTiles extends StatelessWidget {
 
     return Row(
       children: [
-        tile('整體回覆率', '$rate%', AppColors.foreground),
+        tile('整體回覆率', '$rate%', context.colors.foreground),
         const SizedBox(width: 8),
-        tile('已回覆', '$responded', AppColors.success),
+        tile('已回覆', '$responded', context.colors.success),
         const SizedBox(width: 8),
-        tile('待回覆', '${total - responded}', AppColors.accent),
+        tile('待回覆', '${total - responded}', context.colors.accent),
       ],
     );
   }
@@ -220,8 +223,8 @@ class _ProgressRing extends StatelessWidget {
             value: form.progress,
             strokeWidth: 4,
             strokeCap: StrokeCap.round,
-            backgroundColor: AppColors.muted,
-            color: done ? AppColors.success : AppColors.primaryDark,
+            backgroundColor: context.colors.muted,
+            color: done ? context.colors.success : context.colors.primaryDark,
           ),
           Center(
             child: Text(
@@ -284,9 +287,9 @@ class _ProgressCard extends StatelessWidget {
                   Text(
                     '${formatDate(form.deadline)} 截止 · '
                     '${form.respondedCount}/${form.totalCount} 人',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 11,
-                      color: AppColors.mutedForeground,
+                      color: context.colors.mutedForeground,
                     ),
                   ),
                 ],
@@ -299,7 +302,7 @@ class _ProgressCard extends StatelessWidget {
             Icon(
               expanded ? Icons.expand_less : Icons.expand_more,
               size: 20,
-              color: AppColors.mutedForeground,
+              color: context.colors.mutedForeground,
             ),
           ],
         ),
@@ -309,10 +312,10 @@ class _ProgressCard extends StatelessWidget {
     return Container(
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
-        color: AppColors.card,
+        color: context.colors.card,
         borderRadius: BorderRadius.circular(AppRadius.base),
         border: Border.all(
-          color: expanded ? AppColors.primary : AppColors.border,
+          color: expanded ? context.colors.primary : context.colors.border,
           width: expanded ? 1.3 : 1,
         ),
       ),
@@ -322,7 +325,7 @@ class _ProgressCard extends StatelessWidget {
           children: [
             summary,
             if (showList) ...[
-              const Divider(height: 1, color: AppColors.muted),
+              Divider(height: 1, color: context.colors.muted),
               Padding(
                 padding: const EdgeInsets.fromLTRB(10, 10, 10, 8),
                 child: _RecipientList(form, key: ValueKey(form.id)),
@@ -366,9 +369,9 @@ class _RecipientsPanel extends StatelessWidget {
                     ),
                     Text(
                       '${formatDate(form.deadline)} 截止',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 11,
-                        color: AppColors.mutedForeground,
+                        color: context.colors.mutedForeground,
                       ),
                     ),
                   ],
@@ -491,7 +494,7 @@ class _RecipientListState extends State<_RecipientList> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: Colors.white,
+        backgroundColor: context.colors.card,
         title: const Text('結案這份表單？', style: TextStyle(fontSize: 18)),
         content: Text(
           '「${form.title}」結案後就不能再填寫或修改回覆，'
@@ -562,14 +565,14 @@ class _RecipientListState extends State<_RecipientList> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           ?actions,
-          const Padding(
+          Padding(
             padding: EdgeInsets.symmetric(vertical: 20),
             child: Center(
               child: Text(
                 '這份表單尚未指派收件人',
                 style: TextStyle(
                   fontSize: 12,
-                  color: AppColors.mutedForeground,
+                  color: context.colors.mutedForeground,
                 ),
               ),
             ),
@@ -602,7 +605,7 @@ class _RecipientListState extends State<_RecipientList> {
           decoration: BoxDecoration(
             color: on ? bg : bg.withValues(alpha: 0),
             borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: on ? bg : AppColors.border),
+            border: Border.all(color: on ? bg : context.colors.border),
           ),
           child: AnimatedDefaultTextStyle(
             duration: duration,
@@ -611,7 +614,7 @@ class _RecipientListState extends State<_RecipientList> {
               fontFamily: AppText.sans,
               fontSize: 12,
               fontWeight: FontWeight.w600,
-              color: on ? fg : AppColors.mutedForeground,
+              color: on ? fg : context.colors.mutedForeground,
             ),
             child: Text(label),
           ),
@@ -694,9 +697,9 @@ class _RecipientListState extends State<_RecipientList> {
                   children: [
                     TextSpan(
                       text: ' · ${m.department}',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 11,
-                        color: AppColors.mutedForeground,
+                        color: context.colors.mutedForeground,
                       ),
                     ),
                   ],
@@ -704,25 +707,25 @@ class _RecipientListState extends State<_RecipientList> {
               ),
             ),
             if (response == null)
-              const Text(
+              Text(
                 '未回覆',
                 style: TextStyle(
                   fontSize: 11,
-                  color: AppColors.mutedForeground,
+                  color: context.colors.mutedForeground,
                 ),
               )
             else ...[
               Text(
                 formatDateTime(response.submittedAt).substring(5),
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 11,
-                  color: AppColors.mutedForeground,
+                  color: context.colors.mutedForeground,
                 ),
               ),
-              const Icon(
+              Icon(
                 Icons.chevron_right,
                 size: 18,
-                color: AppColors.mutedForeground,
+                color: context.colors.mutedForeground,
               ),
             ],
           ],
@@ -741,12 +744,15 @@ class _DraftList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (drafts.isEmpty) {
-      return const Padding(
+      return Padding(
         padding: EdgeInsets.symmetric(vertical: 40),
         child: Center(
           child: Text(
             '目前沒有草稿',
-            style: TextStyle(fontSize: 12, color: AppColors.mutedForeground),
+            style: TextStyle(
+              fontSize: 12,
+              color: context.colors.mutedForeground,
+            ),
           ),
         ),
       );
@@ -777,9 +783,9 @@ class _DraftList extends StatelessWidget {
                         '${formatDate(form.deadline)} 截止 · '
                         '${form.questions.length} 題 · '
                         '${form.totalCount} 人',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 11,
-                          color: AppColors.mutedForeground,
+                          color: context.colors.mutedForeground,
                         ),
                       ),
                     ],
@@ -789,10 +795,10 @@ class _DraftList extends StatelessWidget {
                 IconButton(
                   tooltip: '刪除',
                   onPressed: () => _confirmDelete(context, form),
-                  icon: const Icon(
+                  icon: Icon(
                     Icons.delete_outline,
                     size: 18,
-                    color: AppColors.destructive,
+                    color: context.colors.destructive,
                   ),
                 ),
               ],
@@ -808,7 +814,7 @@ class _DraftList extends StatelessWidget {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: Colors.white,
+        backgroundColor: context.colors.card,
         title: const Text('刪除表單？', style: TextStyle(fontSize: 18)),
         content: Text('「${form.title}」會被移除，這個動作無法復原。'),
         actions: [
@@ -818,7 +824,7 @@ class _DraftList extends StatelessWidget {
           ),
           FilledButton(
             style: FilledButton.styleFrom(
-              backgroundColor: AppColors.destructive,
+              backgroundColor: context.colors.destructive,
             ),
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('刪除'),
@@ -873,12 +879,15 @@ class _TimelineState extends State<_Timeline> {
     final hidden = all.length - rows.length;
 
     if (all.isEmpty) {
-      return const Padding(
+      return Padding(
         padding: EdgeInsets.symmetric(vertical: 40),
         child: Center(
           child: Text(
             '尚無回覆',
-            style: TextStyle(fontSize: 12, color: AppColors.mutedForeground),
+            style: TextStyle(
+              fontSize: 12,
+              color: context.colors.mutedForeground,
+            ),
           ),
         ),
       );
@@ -899,10 +908,10 @@ class _TimelineState extends State<_Timeline> {
             padding: const EdgeInsets.fromLTRB(4, 8, 4, 8),
             child: Text(
               day,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
-                color: AppColors.mutedForeground,
+                color: context.colors.mutedForeground,
               ),
             ),
           ),
@@ -949,7 +958,7 @@ class _TimelineState extends State<_Timeline> {
                   child: Container(
                     width: 1.5,
                     margin: const EdgeInsets.symmetric(vertical: 4),
-                    color: AppColors.border,
+                    color: context.colors.border,
                   ),
                 ),
             ],
@@ -977,10 +986,10 @@ class _TimelineState extends State<_Timeline> {
                               children: [
                                 TextSpan(
                                   text: '  ${r.member.department}',
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 11,
                                     fontWeight: FontWeight.w400,
-                                    color: AppColors.mutedForeground,
+                                    color: context.colors.mutedForeground,
                                   ),
                                 ),
                               ],
@@ -991,7 +1000,7 @@ class _TimelineState extends State<_Timeline> {
                           time,
                           style: AppText.mono.copyWith(
                             fontSize: 11,
-                            color: AppColors.mutedForeground,
+                            color: context.colors.mutedForeground,
                           ),
                         ),
                       ],
@@ -1020,7 +1029,7 @@ void showResponseDialog(
   showDialog<void>(
     context: context,
     builder: (ctx) => Dialog(
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.card,
       insetPadding: const EdgeInsets.all(16),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppRadius.base + 4),
@@ -1052,9 +1061,9 @@ void showResponseDialog(
                         Text(
                           '${response.member.department} · '
                           '${formatDateTime(response.submittedAt)}',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 11,
-                            color: AppColors.mutedForeground,
+                            color: context.colors.mutedForeground,
                           ),
                         ),
                       ],
@@ -1074,7 +1083,7 @@ void showResponseDialog(
                   vertical: 8,
                 ),
                 decoration: BoxDecoration(
-                  color: AppColors.muted,
+                  color: context.colors.muted,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(form.title, style: const TextStyle(fontSize: 11)),

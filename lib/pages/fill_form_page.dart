@@ -183,9 +183,9 @@ class _FillFormPageState extends State<FillFormPage> {
                     child: Center(
                       child: Text(
                         closed ? '你沒有在結案前回覆這份表單' : '你沒有在截止前回覆這份表單',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 13,
-                          color: AppColors.mutedForeground,
+                          color: context.colors.mutedForeground,
                         ),
                       ),
                     ),
@@ -214,10 +214,10 @@ class _FillFormPageState extends State<FillFormPage> {
                   child: Text(
                     '$reason，無法再${response == null ? '填寫' : '修改'}',
                     textAlign: TextAlign.center,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
-                      color: AppColors.mutedForeground,
+                      color: context.colors.mutedForeground,
                     ),
                   ),
                 ),
@@ -231,10 +231,10 @@ class _FillFormPageState extends State<FillFormPage> {
     final left = _missingRequired.length;
     // Neutral hint until a submit attempt fails, then it matches the red cards.
     final status = left == 0
-        ? AppColors.success
+        ? context.colors.success
         : _showErrors
-        ? AppColors.destructive
-        : AppColors.mutedForeground;
+        ? context.colors.destructive
+        : context.colors.mutedForeground;
     return _ActionBar(
       child: Row(
         children: [
@@ -279,9 +279,9 @@ class _ActionBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
-        color: AppColors.card,
-        border: Border(top: BorderSide(color: AppColors.border)),
+      decoration: BoxDecoration(
+        color: context.colors.card,
+        border: Border(top: BorderSide(color: context.colors.border)),
       ),
       child: SafeArea(
         top: false,
@@ -361,14 +361,14 @@ class _Done extends StatelessWidget {
               Container(
                 width: 76,
                 height: 76,
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: AppColors.successSoft,
+                  color: context.colors.successSoft,
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.check_circle_outline,
                   size: 40,
-                  color: AppColors.success,
+                  color: context.colors.success,
                 ),
               ),
               const SizedBox(height: 18),
@@ -384,10 +384,10 @@ class _Done extends StatelessWidget {
                 '「${form.title}」\n'
                 '已${updated ? '更新' : '送出'} ${form.questions.length} 題回答',
                 textAlign: TextAlign.center,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 13,
                   height: 1.6,
-                  color: AppColors.mutedForeground,
+                  color: context.colors.mutedForeground,
                 ),
               ),
               if (next != null) ...[
@@ -400,9 +400,9 @@ class _Done extends StatelessWidget {
                     children: [
                       Text(
                         '還有 ${todo.length} 份待填寫',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 11,
-                          color: AppColors.mutedForeground,
+                          color: context.colors.mutedForeground,
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -419,9 +419,9 @@ class _Done extends StatelessWidget {
                           ),
                           Text(
                             '${formatDate(next.deadline).substring(5).replaceAll('-', '/')} 截止',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 11,
-                              color: AppColors.primaryDeep,
+                              color: context.colors.primaryDeep,
                             ),
                           ),
                         ],
