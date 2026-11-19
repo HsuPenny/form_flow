@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../data/app_state.dart';
 import '../data/models.dart';
 import '../data/repositories/auth_repository.dart';
+import '../data/text_size_store.dart';
 import '../theme/app_theme.dart';
 import '../widgets/common.dart';
 
@@ -47,6 +48,7 @@ class _SettingsPageState extends State<SettingsPage> {
         department: _app.isAdmin ? _dept : _app.department,
       ),
       failure: '儲存失敗，請稍後再試',
+      loading: true,
     );
     if (saved && mounted) showToast(context, '已儲存變更');
   }
@@ -140,6 +142,24 @@ class _SettingsPageState extends State<SettingsPage> {
                     (m) => m.$1 == app.themeMode,
                   ),
                   onChanged: (i) => app.setThemeMode(_themeModes[i].$1),
+                ),
+              ),
+            ),
+            const _SettingsRow(
+              icon: BrandGlyph.textSize,
+              tone: _Tone.gray,
+              title: '文字大小',
+              subtitle: '會疊加在系統的字體大小設定上',
+              trailing: SizedBox.shrink(),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+              child: SizedBox(
+                width: double.infinity,
+                child: SegmentedTabs(
+                  labels: [for (final s in TextSize.values) s.label],
+                  selected: app.textSize.index,
+                  onChanged: (i) => app.setTextSize(TextSize.values[i]),
                 ),
               ),
             ),
@@ -552,9 +572,12 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
     final app = AppScope.of(context);
     setState(() => _busy = true);
     try {
-      await app.changePassword(
-        currentPassword: _current.text,
-        newPassword: _password.text,
+      await withLoading(
+        context,
+        () => app.changePassword(
+          currentPassword: _current.text,
+          newPassword: _password.text,
+        ),
       );
       if (mounted) Navigator.pop(context, true);
     } on AuthFailure catch (e) {
@@ -616,15 +639,7 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
           listenable: _fields,
           builder: (context, _) => FilledButton(
             onPressed: _canSubmit ? _submit : null,
-            child: _busy
-                ? const SizedBox.square(
-                    dimension: 16,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
-                    ),
-                  )
-                : const Text('更新密碼'),
+            child: const Text('更新密碼'),
           ),
         ),
       ],

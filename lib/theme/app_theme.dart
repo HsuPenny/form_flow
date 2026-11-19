@@ -376,3 +376,30 @@ ThemeData buildAppTheme([Brightness brightness = Brightness.light]) {
     ),
   );
 }
+
+/// Scales text by the system's setting ([base]) times the in-app 文字大小
+/// ([factor]), so the two stack instead of one replacing the other.
+class AppTextScaler extends TextScaler {
+  const AppTextScaler(this.base, this.factor);
+
+  final TextScaler base;
+  final double factor;
+
+  @override
+  double scale(double fontSize) => base.scale(fontSize) * factor;
+
+  @Deprecated('Use scale instead.')
+  @override
+  // ignore: deprecated_member_use
+  double get textScaleFactor => base.textScaleFactor * factor;
+
+  @override
+  bool operator ==(Object other) =>
+      other is AppTextScaler && other.base == base && other.factor == factor;
+
+  @override
+  int get hashCode => Object.hash(base, factor);
+
+  @override
+  String toString() => 'AppTextScaler($base × $factor)';
+}

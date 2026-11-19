@@ -21,6 +21,7 @@ enum BrandGlyph {
   swap,
   lock,
   moon,
+  textSize,
   logout;
 
   /// Whether the glyph has its own outline and banner-edge drawings.
@@ -268,6 +269,12 @@ class _BrandIconPainter extends CustomPainter {
         canvas.drawCircle(const Offset(11, 13), 8.5, p);
         canvas.drawCircle(const Offset(16, 8.5), 6.5, _clear);
         paintSparkle(canvas, const Offset(19.5, 4.5), 3.4, p);
+      case BrandGlyph.textSize:
+        // A big and a small T, like the "Aa" of a font size setting.
+        canvas.drawRRect(_rr(2, 4, 13, 3.4, 1.7), p);
+        canvas.drawRRect(_rr(6.8, 4, 3.4, 16, 1.7), p);
+        canvas.drawRRect(_rr(13, 11, 9, 2.8, 1.4), p);
+        canvas.drawRRect(_rr(16.1, 11, 2.8, 9, 1.4), p);
       case BrandGlyph.logout:
         canvas.drawRRect(_rr(3, 3, 10, 18, 3), p);
         final bar = _rr(9, 10.3, 9, 3.4, 1.7);

@@ -1239,11 +1239,11 @@ class ListPageBody extends StatelessWidget {
   }
 }
 
-/// Goes below a list that loads in batches ([PagedFeed]): a spinner while
-/// the next batch loads, a retry button after a failure, and a note once
-/// everything is loaded. Shows nothing for a list that is empty and done,
-/// so the page can show its own empty state instead.
-class PagedFeedFooter extends StatelessWidget {
+/// Goes below a list that loads in batches ([PagedFeed]): covers the app
+/// with the [LoadingOverlay] while a batch loads, then shows a retry button
+/// after a failure, or a note once everything is loaded. Shows nothing for
+/// a list that is empty and done, so the page can show its own empty state.
+class PagedFeedFooter extends StatefulWidget {
   const PagedFeedFooter(this.feed, {super.key, this.endText = '已經沒有更多了'});
 
   final PagedFeed<Object?> feed;
@@ -1252,31 +1252,48 @@ class PagedFeedFooter extends StatelessWidget {
   final String endText;
 
   @override
+  State<PagedFeedFooter> createState() => _PagedFeedFooterState();
+}
+
+class _PagedFeedFooterState extends State<PagedFeedFooter> {
+  bool _holding = false;
+
+  /// Pull-to-refresh shows its own indicator, so only other loads hold the
+  /// overlay. Synced after the frame: an overlay can't change mid-build.
+  void _syncOverlay() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final feed = widget.feed;
+      final want = feed.isLoading && !feed.isRefreshing;
+      if (want && !_holding) {
+        _holding = true;
+        _holdLoading(context);
+      } else if (!want && _holding) {
+        _holding = false;
+        _releaseLoading();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    if (_holding) _releaseLoading();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    _syncOverlay();
+    final feed = widget.feed;
+    final endText = widget.endText;
     final muted = TextStyle(
       fontSize: 12,
       color: context.colors.mutedForeground,
     );
     final Widget child;
-    if (feed.isRefreshing) {
-      // Pull-to-refresh shows its own indicator.
+    if (feed.isLoading) {
+      // The overlay (or pull-to-refresh) shows the loading.
       return const SizedBox.shrink();
-    } else if (feed.isLoading) {
-      child = Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          SizedBox(
-            width: 14,
-            height: 14,
-            child: CircularProgressIndicator(
-              strokeWidth: 2,
-              color: context.colors.mutedForeground,
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text('載入中…', style: muted),
-        ],
-      );
     } else if (feed.error != null) {
       child = TextButton.icon(
         onPressed: () => feed.loadMore(retry: true),
@@ -1561,19 +1578,139 @@ void showToast(BuildContext context, String message) {
 }
 
 /// Runs [action]; if it throws, shows [failure] as a toast. Returns whether
-/// it succeeded.
+/// it succeeded. With [loading], the app is covered by [withLoading] while
+/// it runs; leave it off for quiet work such as a refresh or a toggle.
 Future<bool> runOrToast(
   BuildContext context,
   Future<void> Function() action, {
   String failure = '連線失敗，請稍後再試',
+  bool loading = false,
 }) async {
   try {
-    await action();
+    await (loading ? withLoading(context, action) : action());
     return true;
   } catch (e) {
     debugPrint('$e');
     if (context.mounted) showToast(context, failure);
     return false;
+  }
+}
+
+OverlayEntry? _loadingEntry;
+int _loadingDepth = 0;
+
+/// Shows the shared [LoadingOverlay] until a matching [_releaseLoading].
+/// Overlapping holders share one overlay; the last release removes it.
+void _holdLoading(BuildContext context) {
+  if (_loadingDepth++ == 0) {
+    _loadingEntry = OverlayEntry(builder: (_) => const LoadingOverlay());
+    Overlay.of(context, rootOverlay: true).insert(_loadingEntry!);
+  }
+}
+
+void _releaseLoading() {
+  if (--_loadingDepth == 0) {
+    _loadingEntry?.remove();
+    _loadingEntry = null;
+  }
+}
+
+/// Covers the whole app (dialogs included) with a [LoadingOverlay] while
+/// [action] runs, so nothing underneath can be tapped twice.
+Future<T> withLoading<T>(
+  BuildContext context,
+  Future<T> Function() action,
+) async {
+  _holdLoading(context);
+  try {
+    return await action();
+  } finally {
+    _releaseLoading();
+  }
+}
+
+/// A dimmed full-screen barrier with the pull-to-refresh sparkles hopping
+/// in the middle. Blocks taps right away but fades in after a short beat,
+/// so a quick request doesn't flash it. Shown through [withLoading] and,
+/// while a list loads its next batch, [PagedFeedFooter].
+class LoadingOverlay extends StatefulWidget {
+  const LoadingOverlay({super.key, this.label = '處理中…'});
+
+  final String label;
+
+  @override
+  State<LoadingOverlay> createState() => _LoadingOverlayState();
+}
+
+class _LoadingOverlayState extends State<LoadingOverlay>
+    with SingleTickerProviderStateMixin {
+  late final _loop = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1100),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _loop.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: widget.label,
+      liveRegion: true,
+      child: TweenAnimationBuilder<double>(
+        tween: Tween(begin: 0, end: 1),
+        duration: const Duration(milliseconds: 350),
+        // The first ~150 ms stay clear: the delay before it shows.
+        curve: const Interval(0.45, 1, curve: Curves.easeOut),
+        builder: (context, t, child) => ColoredBox(
+          color: Colors.black.withValues(alpha: 0.45 * t),
+          child: Opacity(opacity: t, child: child),
+        ),
+        child: SizedBox.expand(
+          // Swallows every tap, including on the dimmed area.
+          child: AbsorbPointer(
+            // Transparent, only so the label gets the theme's text style.
+            child: Material(
+              type: MaterialType.transparency,
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    AnimatedBuilder(
+                      animation: _loop,
+                      builder: (context, _) => CustomPaint(
+                        size: const Size(_SparkleRowPainter.width, 30),
+                        painter: _SparkleRowPainter(
+                          shown: 1,
+                          loop: _loop.value,
+                          colors: [
+                            context.colors.primary,
+                            context.colors.primaryDark,
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      widget.label,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        // On the dimmed barrier in both themes.
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 

@@ -588,6 +588,7 @@ class _RecipientListState extends State<_RecipientList> {
       context,
       () async => widget.onChanged(await change()),
       failure: failure,
+      loading: true,
     );
     return ok;
   }
@@ -975,6 +976,7 @@ class _DraftList extends StatelessWidget {
       context,
       () => app.deleteForm(form),
       failure: '刪除失敗，請稍後再試',
+      loading: true,
     );
     if (!deleted || !context.mounted) return;
     onDeleted(form);
