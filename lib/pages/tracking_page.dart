@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -6,6 +7,7 @@ import 'package:share_plus/share_plus.dart';
 import '../data/app_state.dart';
 import '../data/form_report.dart';
 import '../data/models.dart';
+import '../data/paged_feed.dart';
 import '../theme/app_theme.dart';
 import '../widgets/common.dart';
 import '../widgets/form_renderer.dart';
@@ -20,28 +22,127 @@ class TrackingPage extends StatefulWidget {
   State<TrackingPage> createState() => _TrackingPageState();
 }
 
+enum _Tab { progress, timeline, drafts }
+
 class _TrackingPageState extends State<TrackingPage> {
-  int _tab = 0; // 0 完成進度, 1 最新回覆, 2 草稿
+  _Tab _tab = _Tab.progress;
   String _query = '';
   String? _expandedId;
 
+  /// Waits for typing to pause before searching the batched tabs again.
+  Timer? _searchDebounce;
+
+  late final AppState _app;
+
+  /// 完成進度 and 最新回覆 grow without end, so they load a batch at a time
+  /// as the list scrolls. 草稿 are few and load in one go.
+  late final PagedFeed<FormItem> _forms;
+  late final PagedFeed<ResponseEntry> _responses;
+  bool _started = false;
+
+  /// Forms changed here (新增填寫人員 / 延長截止日 / 結案) since their batch
+  /// loaded; shown instead of the loaded copy until the list reloads.
+  final _updated = <String, FormItem>{};
+
+  /// Null until loaded.
+  List<FormItem>? _drafts;
+  ProgressSummary? _summary;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_started) return;
+    _started = true;
+    _app = AppScope.of(context);
+    _forms = PagedFeed<FormItem>(
+      (offset) => _app.fetchPublishedForms(query: _query, offset: offset),
+    )..addListener(_onFeedChanged);
+    _responses = PagedFeed<ResponseEntry>(
+      (offset) => _app.fetchResponses(query: _query, offset: offset),
+    )..addListener(_onFeedChanged);
+    _reloadFeeds();
+    _loadSummaryAndDrafts().catchError((Object e) {
+      debugPrint('Could not load summary or drafts: $e');
+    });
+  }
+
+  void _onFeedChanged() => setState(() {});
+
+  @override
+  void dispose() {
+    _searchDebounce?.cancel();
+    _forms.dispose();
+    _responses.dispose();
+    super.dispose();
+  }
+
+  Future<void> _reloadFeeds() {
+    _updated.clear();
+    return Future.wait([_forms.reload(), _responses.reload()]);
+  }
+
+  Future<void> _loadSummaryAndDrafts() async {
+    final (summary, drafts) = await (
+      _app.fetchProgressSummary(),
+      _app.fetchDrafts(),
+    ).wait;
+    if (!mounted) return;
+    setState(() {
+      _summary = summary;
+      _drafts = drafts;
+    });
+  }
+
+  /// Pull-to-refresh. A failed batch shows its own retry button, so only
+  /// the rest toasts on failure.
+  Future<void> _refresh() async {
+    final feeds = _reloadFeeds();
+    await runOrToast(
+      context,
+      () => (_loadSummaryAndDrafts(), _app.refreshMembers()).wait,
+    );
+    await feeds;
+  }
+
+  void _onQueryChanged(String v) {
+    setState(() => _query = v);
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 300), _reloadFeeds);
+  }
+
+  /// [form] changed on this page; the totals change with it.
+  void _onFormChanged(FormItem form) {
+    setState(() => _updated[form.id] = form);
+    _app
+        .fetchProgressSummary()
+        .then((s) {
+          if (mounted) setState(() => _summary = s);
+        })
+        .catchError((Object e) {
+          debugPrint('Could not reload summary: $e');
+        });
+  }
+
+  void _onDraftDeleted(FormItem form) =>
+      setState(() => _drafts?.removeWhere((f) => f.id == form.id));
+
   @override
   Widget build(BuildContext context) {
-    final app = AppScope.of(context);
     final nav = ShellNav.of(context);
     final wide = isWide(context);
-    // Drafts have no replies yet, so they only show up under 草稿.
-    final published = app.forms
-        .where((f) => f.status != FormStatus.draft)
-        .toList();
-    bool matches(FormItem f) => f.title.contains(_query.trim());
-    final forms = published.where(matches).toList();
-    final drafts = app.forms
-        .where((f) => f.status == FormStatus.draft && matches(f))
+    // Drafts have no replies yet, so they only show up under 草稿, filtered
+    // here since they are all loaded.
+    final drafts = _drafts
+        ?.where((f) => f.title.contains(_query.trim()))
         .toList();
 
     return ListPageBody(
-      onRefresh: () => runOrToast(context, app.refreshForms),
+      onNearEnd: switch (_tab) {
+        _Tab.progress => _forms.loadMore,
+        _Tab.timeline => _responses.loadMore,
+        _Tab.drafts => null,
+      },
+      onRefresh: _refresh,
       header: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -60,16 +161,17 @@ class _TrackingPageState extends State<TrackingPage> {
                 : null,
           ),
           const SizedBox(height: 12),
-          // Totals across every published form, whatever the search.
-          _StatTiles(published),
+          // Totals across every published form, whatever the search and
+          // however much of the list has loaded.
+          _StatTiles(_summary),
           const SizedBox(height: 16),
           TabsWithSearch(
             tabs: SegmentedTabs(
               labels: const ['完成進度', '最新回覆', '草稿'],
-              selected: _tab,
-              onChanged: (i) => setState(() => _tab = i),
+              selected: _tab.index,
+              onChanged: (i) => setState(() => _tab = _Tab.values[i]),
             ),
-            onQueryChanged: (v) => setState(() => _query = v),
+            onQueryChanged: _onQueryChanged,
           ),
         ],
       ),
@@ -77,9 +179,12 @@ class _TrackingPageState extends State<TrackingPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           switch (_tab) {
-            0 => _progressView(forms),
-            1 => _Timeline(forms),
-            _ => _DraftList(drafts),
+            _Tab.progress => _progressView(),
+            _Tab.timeline => _Timeline(_responses),
+            _Tab.drafts =>
+              drafts == null
+                  ? const SizedBox.shrink()
+                  : _DraftList(drafts, onDeleted: _onDraftDeleted),
           },
           // Keep the last card clear of the floating 建立表單 button.
           if (!wide) const SizedBox(height: 64),
@@ -88,20 +193,10 @@ class _TrackingPageState extends State<TrackingPage> {
     );
   }
 
-  Widget _progressView(List<FormItem> forms) {
-    if (forms.isEmpty) {
-      return Padding(
-        padding: EdgeInsets.symmetric(vertical: 40),
-        child: Center(
-          child: Text(
-            '這裡目前沒有表單',
-            style: TextStyle(
-              fontSize: 12,
-              color: context.colors.mutedForeground,
-            ),
-          ),
-        ),
-      );
+  Widget _progressView() {
+    final forms = [for (final f in _forms.items) _updated[f.id] ?? f];
+    if (forms.isEmpty && !_forms.hasMore && _forms.error == null) {
+      return const _EmptyNote('這裡目前沒有表單');
     }
     final wide = isWide(context);
     FormItem? expanded;
@@ -119,9 +214,11 @@ class _TrackingPageState extends State<TrackingPage> {
             showList: !wide && f.id == _expandedId,
             onTap: () =>
                 setState(() => _expandedId = _expandedId == f.id ? null : f.id),
+            onChanged: _onFormChanged,
           ),
           const SizedBox(height: 10),
         ],
+        PagedFeedFooter(_forms, endText: '已經沒有更多表單了'),
       ],
     );
 
@@ -138,6 +235,7 @@ class _TrackingPageState extends State<TrackingPage> {
               : _RecipientsPanel(
                   form: expanded,
                   onClose: () => setState(() => _expandedId = null),
+                  onChanged: _onFormChanged,
                 ),
         ),
       ],
@@ -145,20 +243,37 @@ class _TrackingPageState extends State<TrackingPage> {
   }
 }
 
-/// 整體回覆率 / 已回覆 / 待回覆 across the forms being shown.
-class _StatTiles extends StatelessWidget {
-  const _StatTiles(this.forms);
+/// Gray note for a list with nothing in it.
+class _EmptyNote extends StatelessWidget {
+  const _EmptyNote(this.text);
 
-  final List<FormItem> forms;
+  final String text;
 
   @override
   Widget build(BuildContext context) {
-    var total = 0, responded = 0;
-    for (final f in forms) {
-      total += f.totalCount;
-      responded += f.respondedCount;
-    }
-    final rate = total == 0 ? 0 : (responded / total * 100).round();
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 40),
+      child: Center(
+        child: Text(
+          text,
+          style: TextStyle(fontSize: 12, color: context.colors.mutedForeground),
+        ),
+      ),
+    );
+  }
+}
+
+/// 整體回覆率 / 已回覆 / 待回覆 across every published form; dashes until
+/// the totals arrive.
+class _StatTiles extends StatelessWidget {
+  const _StatTiles(this.summary);
+
+  final ProgressSummary? summary;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = summary;
+    String show(Object? v) => v == null ? '–' : '$v';
 
     Widget tile(String label, String value, Color color) => Expanded(
       child: Container(
@@ -194,11 +309,15 @@ class _StatTiles extends StatelessWidget {
 
     return Row(
       children: [
-        tile('整體回覆率', '$rate%', context.colors.foreground),
+        tile(
+          '整體回覆率',
+          s == null ? '–' : '${s.percent}%',
+          context.colors.foreground,
+        ),
         const SizedBox(width: 8),
-        tile('已回覆', '$responded', context.colors.success),
+        tile('已回覆', show(s?.responded), context.colors.success),
         const SizedBox(width: 8),
-        tile('待回覆', '${total - responded}', context.colors.accent),
+        tile('待回覆', show(s?.waiting), context.colors.accent),
       ],
     );
   }
@@ -255,12 +374,14 @@ class _ProgressCard extends StatelessWidget {
     required this.expanded,
     required this.showList,
     required this.onTap,
+    required this.onChanged,
   });
 
   final FormItem form;
   final bool expanded;
   final bool showList;
   final VoidCallback onTap;
+  final ValueChanged<FormItem> onChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -328,7 +449,11 @@ class _ProgressCard extends StatelessWidget {
               Divider(height: 1, color: context.colors.muted),
               Padding(
                 padding: const EdgeInsets.fromLTRB(10, 10, 10, 8),
-                child: _RecipientList(form, key: ValueKey(form.id)),
+                child: _RecipientList(
+                  form,
+                  onChanged: onChanged,
+                  key: ValueKey(form.id),
+                ),
               ),
             ],
           ],
@@ -340,10 +465,15 @@ class _ProgressCard extends StatelessWidget {
 
 /// Side panel with the name list, used on wide screens.
 class _RecipientsPanel extends StatelessWidget {
-  const _RecipientsPanel({required this.form, required this.onClose});
+  const _RecipientsPanel({
+    required this.form,
+    required this.onClose,
+    required this.onChanged,
+  });
 
   final FormItem form;
   final VoidCallback onClose;
+  final ValueChanged<FormItem> onChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -385,7 +515,7 @@ class _RecipientsPanel extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 14),
-          _RecipientList(form, key: ValueKey(form.id)),
+          _RecipientList(form, onChanged: onChanged, key: ValueKey(form.id)),
         ],
       ),
     );
@@ -398,9 +528,12 @@ enum _View { waiting, responded, stats }
 /// stats. Starts on 未回覆, since those are the people you usually need to
 /// chase.
 class _RecipientList extends StatefulWidget {
-  const _RecipientList(this.form, {super.key});
+  const _RecipientList(this.form, {required this.onChanged, super.key});
 
   final FormItem form;
+
+  /// Gets the form back from the backend after it was changed here.
+  final ValueChanged<FormItem> onChanged;
 
   @override
   State<_RecipientList> createState() => _RecipientListState();
@@ -440,6 +573,20 @@ class _RecipientListState extends State<_RecipientList> {
     );
   }
 
+  /// Runs a change to the form and hands the updated form to the page;
+  /// false (after a toast) when it failed.
+  Future<bool> _update(
+    Future<FormItem> Function() change, {
+    required String failure,
+  }) async {
+    final ok = await runOrToast(
+      context,
+      () async => widget.onChanged(await change()),
+      failure: failure,
+    );
+    return ok;
+  }
+
   /// Picks people who aren't recipients yet and adds them to the form.
   Future<void> _addRecipients() async {
     final app = AppScope.of(context);
@@ -452,8 +599,7 @@ class _RecipientListState extends State<_RecipientList> {
       ],
     );
     if (picked == null || picked.isEmpty || !mounted) return;
-    final added = await runOrToast(
-      context,
+    final added = await _update(
       () => app.addRecipients(form, picked),
       failure: '新增失敗，請稍後再試',
     );
@@ -478,8 +624,7 @@ class _RecipientListState extends State<_RecipientList> {
       lastDate: DateTime(earliest.year + 3, 12, 31),
     );
     if (picked == null || !mounted) return;
-    final saved = await runOrToast(
-      context,
+    final saved = await _update(
       () => app.extendDeadline(form, picked),
       failure: '延長失敗，請稍後再試',
     );
@@ -514,8 +659,7 @@ class _RecipientListState extends State<_RecipientList> {
     );
     if (ok != true || !mounted) return;
     final app = AppScope.of(context);
-    final closed = await runOrToast(
-      context,
+    final closed = await _update(
       () => app.closeForm(form),
       failure: '結案失敗，請稍後再試',
     );
@@ -737,26 +881,14 @@ class _RecipientListState extends State<_RecipientList> {
 
 /// 草稿: unpublished forms. Tap one to keep editing it.
 class _DraftList extends StatelessWidget {
-  const _DraftList(this.drafts);
+  const _DraftList(this.drafts, {required this.onDeleted});
 
   final List<FormItem> drafts;
+  final ValueChanged<FormItem> onDeleted;
 
   @override
   Widget build(BuildContext context) {
-    if (drafts.isEmpty) {
-      return Padding(
-        padding: EdgeInsets.symmetric(vertical: 40),
-        child: Center(
-          child: Text(
-            '目前沒有草稿',
-            style: TextStyle(
-              fontSize: 12,
-              color: context.colors.mutedForeground,
-            ),
-          ),
-        ),
-      );
-    }
+    if (drafts.isEmpty) return const _EmptyNote('目前沒有草稿');
 
     final nav = ShellNav.of(context);
     return Column(
@@ -839,24 +971,18 @@ class _DraftList extends StatelessWidget {
       () => app.deleteForm(form),
       failure: '刪除失敗，請稍後再試',
     );
-    if (deleted && context.mounted) showToast(context, '已刪除表單');
+    if (!deleted || !context.mounted) return;
+    onDeleted(form);
+    showToast(context, '已刪除表單');
   }
 }
 
-/// 最新回覆: newest first, grouped by day (今天 / 昨天 / date). Shows
-/// [_pageSize] at a time; 顯示更多 reveals the next batch.
-class _Timeline extends StatefulWidget {
-  const _Timeline(this.forms);
+/// 最新回覆: every reply across the forms, newest first, grouped by day
+/// (今天 / 昨天 / date). Loads a batch at a time as the list scrolls.
+class _Timeline extends StatelessWidget {
+  const _Timeline(this.feed);
 
-  final List<FormItem> forms;
-
-  @override
-  State<_Timeline> createState() => _TimelineState();
-}
-
-class _TimelineState extends State<_Timeline> {
-  static const _pageSize = 50;
-  int _limit = _pageSize;
+  final PagedFeed<ResponseEntry> feed;
 
   static String _dayLabel(DateTime d) {
     final now = DateTime.now();
@@ -871,29 +997,14 @@ class _TimelineState extends State<_Timeline> {
 
   @override
   Widget build(BuildContext context) {
-    final all = [
-      for (final f in widget.forms)
-        for (final r in f.responses) (form: f, response: r),
-    ]..sort((a, b) => b.response.submittedAt.compareTo(a.response.submittedAt));
-    final rows = all.take(_limit);
-    final hidden = all.length - rows.length;
-
-    if (all.isEmpty) {
-      return Padding(
-        padding: EdgeInsets.symmetric(vertical: 40),
-        child: Center(
-          child: Text(
-            '尚無回覆',
-            style: TextStyle(
-              fontSize: 12,
-              color: context.colors.mutedForeground,
-            ),
-          ),
-        ),
-      );
+    final rows = feed.items;
+    if (rows.isEmpty && !feed.hasMore && feed.error == null) {
+      return const _EmptyNote('尚無回覆');
     }
 
-    final groups = <String, List<({FormItem form, FormResponse response})>>{};
+    // Batches arrive newest first, so a day split across two batches still
+    // lands in one group.
+    final groups = <String, List<ResponseEntry>>{};
     for (final row in rows) {
       groups
           .putIfAbsent(_dayLabel(row.response.submittedAt), () => [])
@@ -923,17 +1034,7 @@ class _TimelineState extends State<_Timeline> {
               last: i == items.length - 1,
             ),
         ],
-        if (hidden > 0) ...[
-          const SizedBox(height: 8),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton(
-              style: OutlinedButton.styleFrom(minimumSize: const Size(0, 40)),
-              onPressed: () => setState(() => _limit += _pageSize),
-              child: Text('顯示更多（還有 $hidden 筆）'),
-            ),
-          ),
-        ],
+        PagedFeedFooter(feed, endText: '已經沒有更多回覆了'),
       ],
     );
   }

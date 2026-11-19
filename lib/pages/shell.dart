@@ -55,10 +55,11 @@ class AppShellState extends State<AppShell> {
       _section = section;
       _subPage = null;
     });
-    // Pull-to-refresh needs touch, so also refresh on every section switch;
-    // the page keeps showing what it has if this fails.
-    AppScope.of(context).refreshForms().catchError((Object e) {
-      debugPrint('Could not refresh forms: $e');
+    // Pull-to-refresh needs touch, so also refresh on every section switch
+    // (the pages load their forms fresh as they open); the page keeps
+    // showing what it has if this fails.
+    AppScope.of(context).refreshMembers().catchError((Object e) {
+      debugPrint('Could not refresh members: $e');
     });
   }
 

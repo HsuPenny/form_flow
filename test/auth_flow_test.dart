@@ -46,10 +46,11 @@ void main() {
       expect(state.isLoggedIn, true);
       expect(state.displayName, '測試者');
       expect(state.email, 'a@b.c');
-      expect(state.forms, isNotEmpty);
+      final forms = (await state.fetchPublishedForms()).items;
+      expect(forms, isNotEmpty);
 
-      await state.submitResponse(state.forms.first, {0: 'x'});
-      expect(state.forms.first.hasResponded(state.me), true);
+      final saved = await state.submitResponse(forms.first, {0: 'x'});
+      expect(saved.hasResponded(state.me), true);
 
       // Let the validation toast time out so it doesn't cover the page.
       await tester.pump(const Duration(seconds: 5));

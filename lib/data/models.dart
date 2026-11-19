@@ -234,6 +234,32 @@ class FormItem {
   }
 }
 
+/// One row of 最新回覆: a reply and the form it answers.
+///
+/// [form] only carries what showing the reply needs (title, questions and
+/// so on); its recipients and responses are left empty so a batch of
+/// replies doesn't drag every form's replies along.
+class ResponseEntry {
+  const ResponseEntry({required this.form, required this.response});
+
+  final FormItem form;
+  final FormResponse response;
+}
+
+/// 整體回覆率 / 已回覆 / 待回覆 across every published form, counted by the
+/// backend so it doesn't depend on which batches a list has loaded.
+class ProgressSummary {
+  const ProgressSummary({required this.recipients, required this.responded});
+
+  /// People asked, summed over the forms (one person on two forms is 2).
+  final int recipients;
+  final int responded;
+
+  int get waiting => recipients - responded;
+  int get percent =>
+      recipients == 0 ? 0 : (responded / recipients * 100).round();
+}
+
 String formatDate(DateTime d) => '${d.year}-${_two(d.month)}-${_two(d.day)}';
 
 String formatDateTime(DateTime d) =>

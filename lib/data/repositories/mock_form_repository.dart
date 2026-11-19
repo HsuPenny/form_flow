@@ -14,7 +14,55 @@ class MockFormRepository implements FormRepository {
   Future<List<String>> fetchDepartments() async => [...MockData.departments];
 
   @override
-  Future<List<FormItem>> fetchForms() async => [..._forms];
+  Future<List<FormItem>> fetchDrafts() async => [
+    for (final f in _forms)
+      if (f.status == FormStatus.draft) f,
+  ];
+
+  /// [_forms] is kept newest first, like `created_at.desc` on the backend.
+  @override
+  Future<PageResult<FormItem>> fetchPublishedForms({
+    String query = '',
+    int offset = 0,
+    int limit = PageResult.size,
+  }) async {
+    final matches = [
+      for (final f in _forms)
+        if (f.status != FormStatus.draft && f.title.contains(query.trim())) f,
+    ];
+    return PageResult(
+      matches.skip(offset).take(limit).toList(),
+      matches.length,
+    );
+  }
+
+  @override
+  Future<PageResult<ResponseEntry>> fetchResponses({
+    String query = '',
+    int offset = 0,
+    int limit = PageResult.size,
+  }) async {
+    final matches = [
+      for (final f in _forms)
+        if (f.title.contains(query.trim()))
+          for (final r in f.responses) ResponseEntry(form: f, response: r),
+    ]..sort((a, b) => b.response.submittedAt.compareTo(a.response.submittedAt));
+    return PageResult(
+      matches.skip(offset).take(limit).toList(),
+      matches.length,
+    );
+  }
+
+  @override
+  Future<ProgressSummary> fetchProgressSummary() async {
+    var recipients = 0, responded = 0;
+    for (final f in _forms) {
+      if (f.status == FormStatus.draft) continue;
+      recipients += f.totalCount;
+      responded += f.respondedCount;
+    }
+    return ProgressSummary(recipients: recipients, responded: responded);
+  }
 
   @override
   Future<PageResult<FormItem>> fetchMyForms({

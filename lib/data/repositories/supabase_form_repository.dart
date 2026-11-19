@@ -52,13 +52,104 @@ class SupabaseFormRepository implements FormRepository {
     return [for (final r in res.data!) (r as Map)['name'] as String];
   }
 
+  /// Asks PostgREST to count every match, not just the batch; the total
+  /// comes back in Content-Range (see [_total]).
+  static final _counted = Options(headers: {'Prefer': 'count=exact'});
+
+  /// The total from a [_counted] response: "0-19/57", or "*/0" when nothing
+  /// matches. Falls back to what has been loaded so far.
+  static int _total(Response<dynamic> res, int loaded) {
+    final range = res.headers.value('content-range');
+    return int.tryParse(range?.split('/').last ?? '') ?? loaded;
+  }
+
   @override
-  Future<List<FormItem>> fetchForms() async {
+  Future<List<FormItem>> fetchDrafts() async {
     final res = await _dio.get<List<dynamic>>(
       '/rest/v1/forms',
-      queryParameters: {'select': _formColumns, 'order': 'created_at.desc'},
+      queryParameters: {
+        'select': _formColumns,
+        'status': 'eq.draft',
+        'order': 'created_at.desc,id.desc',
+      },
     );
     return [for (final r in res.data!) _formFrom(r as Map<String, dynamic>)];
+  }
+
+  @override
+  Future<PageResult<FormItem>> fetchPublishedForms({
+    String query = '',
+    int offset = 0,
+    int limit = PageResult.size,
+  }) async {
+    final q = query.trim();
+    final res = await _dio.get<List<dynamic>>(
+      '/rest/v1/forms',
+      queryParameters: {
+        'select': _formColumns,
+        'status': 'neq.draft',
+        if (q.isNotEmpty) 'title': 'ilike.*$q*',
+        // id breaks ties so a batch boundary never repeats or skips a form.
+        'order': 'created_at.desc,id.desc',
+        'offset': offset,
+        'limit': limit,
+      },
+      options: _counted,
+    );
+    final items = [
+      for (final r in res.data!) _formFrom(r as Map<String, dynamic>),
+    ];
+    return PageResult(items, _total(res, offset + items.length));
+  }
+
+  @override
+  Future<PageResult<ResponseEntry>> fetchResponses({
+    String query = '',
+    int offset = 0,
+    int limit = PageResult.size,
+  }) async {
+    final q = query.trim();
+    final res = await _dio.get<List<dynamic>>(
+      '/rest/v1/responses',
+      queryParameters: {
+        // Just the form's own columns: its other replies aren't needed here.
+        // Inner join, so the title filter drops replies to other forms.
+        'select':
+            'answers,submitted_at,'
+            'profiles!responses_member_id_fkey($_profileColumns),'
+            'forms!responses_form_id_fkey!inner('
+            'id,title,description,deadline,status,questions)',
+        if (q.isNotEmpty) 'forms.title': 'ilike.*$q*',
+        'order': 'submitted_at.desc,id.desc',
+        'offset': offset,
+        'limit': limit,
+      },
+      options: _counted,
+    );
+    final rows = res.data!.cast<Map<String, dynamic>>();
+    final items = [
+      for (final r in rows)
+        // A profile hidden by RLS (null) can't be shown.
+        if (r['profiles'] case final Map<String, dynamic> p)
+          ResponseEntry(
+            form: _formFrom(r['forms'] as Map<String, dynamic>),
+            response: _responseFrom(r, _memberFrom(p)),
+          ),
+    ];
+    return PageResult(items, _total(res, offset + rows.length));
+  }
+
+  @override
+  Future<ProgressSummary> fetchProgressSummary() async {
+    final res = await _dio.post<Map<String, dynamic>>(
+      '/rest/v1/rpc/progress_summary',
+      options: _single,
+    );
+    final row = res.data!;
+    return ProgressSummary(
+      recipients: (row['recipients'] as num).toInt(),
+      responded: (row['responded'] as num).toInt(),
+    );
   }
 
   @override
@@ -104,15 +195,12 @@ class SupabaseFormRepository implements FormRepository {
         'offset': offset,
         'limit': limit,
       },
-      options: Options(headers: {'Prefer': 'count=exact'}),
+      options: _counted,
     );
     final items = [
       for (final r in res.data!) _formFrom(r as Map<String, dynamic>),
     ];
-    // "0-19/57", or "*/0" when nothing matches.
-    final range = res.headers.value('content-range');
-    final total = int.tryParse(range?.split('/').last ?? '');
-    return PageResult(items, total ?? offset + items.length);
+    return PageResult(items, _total(res, offset + items.length));
   }
 
   @override
@@ -212,19 +300,22 @@ FormItem _formFrom(Map<String, dynamic> row) => FormItem(
     for (final q in row['questions'] as List) _questionFrom(q as Map),
   ],
   // An embedded profile is null when RLS hides it from the current user.
+  // Both lists are missing when only the form's own columns were selected.
   recipients: [
-    for (final r in row['form_recipients'] as List)
+    for (final r in row['form_recipients'] as List? ?? const [])
       if (r['profiles'] case final Map<String, dynamic> p) _memberFrom(p),
   ],
   responses: [
-    for (final r in row['responses'] as List)
+    for (final r in row['responses'] as List? ?? const [])
       if (r['profiles'] case final Map<String, dynamic> p)
-        FormResponse(
-          member: _memberFrom(p),
-          submittedAt: DateTime.parse(r['submitted_at'] as String).toLocal(),
-          answers: _answersFrom(r['answers'] as Map),
-        ),
+        _responseFrom(r as Map, _memberFrom(p)),
   ],
+);
+
+FormResponse _responseFrom(Map row, Member member) => FormResponse(
+  member: member,
+  submittedAt: DateTime.parse(row['submitted_at'] as String).toLocal(),
+  answers: _answersFrom(row['answers'] as Map),
 );
 
 Map<String, Object> _questionToJson(Question q) => {
