@@ -81,16 +81,16 @@ class _TrackingPageState extends State<TrackingPage> {
     return Future.wait([_forms.reload(), _responses.reload()]);
   }
 
+  /// Each one shows as soon as it arrives, so a failing summary (e.g. the
+  /// progress_summary RPC not yet deployed) doesn't also hide the drafts.
   Future<void> _loadSummaryAndDrafts() async {
-    final (summary, drafts) = await (
-      _app.fetchProgressSummary(),
-      _app.fetchDrafts(),
-    ).wait;
-    if (!mounted) return;
-    setState(() {
-      _summary = summary;
-      _drafts = drafts;
+    final summary = _app.fetchProgressSummary().then((s) {
+      if (mounted) setState(() => _summary = s);
     });
+    final drafts = _app.fetchDrafts().then((d) {
+      if (mounted) setState(() => _drafts = d);
+    });
+    await (summary, drafts).wait;
   }
 
   /// Pull-to-refresh. A failed batch shows its own retry button, so only
