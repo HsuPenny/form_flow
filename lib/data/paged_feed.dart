@@ -23,9 +23,11 @@ class PagedFeed<T> extends ChangeNotifier {
   final List<T> _items = [];
   int? _total;
   bool _loading = false;
+  bool _refreshing = false;
   Object? _error;
 
-  /// Bumped by [reload], so a batch requested before it is dropped.
+  /// Bumped by [reload] and [refresh], so a batch requested before it is
+  /// dropped.
   int _generation = 0;
 
   /// The page can go away while a batch is loading.
@@ -43,32 +45,56 @@ class PagedFeed<T> extends ChangeNotifier {
   int? get total => _total;
   bool get isLoading => _loading;
 
+  /// True while [refresh] fetches the first batch again.
+  bool get isRefreshing => _refreshing;
+
   /// Why the last batch failed; cleared by the next attempt.
   Object? get error => _error;
   bool get hasMore => _total == null || _items.length < _total!;
 
-  /// Starts over from the first batch, e.g. after pull-to-refresh or a new
-  /// search. Failures end up in [error] instead of being thrown.
+  /// Starts over from the first batch, e.g. after a new search: the list
+  /// empties and shows its loading footer. Failures end up in [error]
+  /// instead of being thrown.
   Future<void> reload() {
     _generation++;
     _items.clear();
     _total = null;
     _loading = false;
+    _refreshing = false;
     _error = null;
     return loadMore();
+  }
+
+  /// Fetches the first batch again for pull-to-refresh. The current items
+  /// stay on screen until it arrives and are then replaced, and lists hide
+  /// their own spinner meanwhile ([isRefreshing]): the pull indicator
+  /// already shows progress.
+  Future<void> refresh() {
+    _generation++;
+    _refreshing = true;
+    _loading = false;
+    _error = null;
+    return _fetch(replace: true);
   }
 
   /// Loads the next batch, unless one is on its way, the last one failed
   /// (pass [retry] to try again), or everything is loaded.
   Future<void> loadMore({bool retry = false}) async {
     if (_loading || !hasMore || (_error != null && !retry)) return;
+    return _fetch(replace: false);
+  }
+
+  /// Fetches the batch after the current items, or the first batch in their
+  /// place when [replace] is set.
+  Future<void> _fetch({required bool replace}) async {
     final generation = _generation;
     _loading = true;
     _error = null;
     notifyListeners();
     try {
-      final page = await _load(_items.length);
+      final page = await _load(replace ? 0 : _items.length);
       if (generation != _generation) return;
+      if (replace) _items.clear();
       _items.addAll(page.items);
       _total = page.total;
       // An empty batch means the list ended early, e.g. items changed while
@@ -81,6 +107,7 @@ class PagedFeed<T> extends ChangeNotifier {
     } finally {
       if (generation == _generation && !_disposed) {
         _loading = false;
+        _refreshing = false;
         notifyListeners();
       }
     }

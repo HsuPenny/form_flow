@@ -1258,7 +1258,10 @@ class PagedFeedFooter extends StatelessWidget {
       color: context.colors.mutedForeground,
     );
     final Widget child;
-    if (feed.isLoading) {
+    if (feed.isRefreshing) {
+      // Pull-to-refresh shows its own indicator.
+      return const SizedBox.shrink();
+    } else if (feed.isLoading) {
       child = Row(
         mainAxisSize: MainAxisSize.min,
         children: [

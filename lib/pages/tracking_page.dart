@@ -96,7 +96,12 @@ class _TrackingPageState extends State<TrackingPage> {
   /// Pull-to-refresh. A failed batch shows its own retry button, so only
   /// the rest toasts on failure.
   Future<void> _refresh() async {
-    final feeds = _reloadFeeds();
+    // Keeps the lists on screen while they reload. The fresh batches already
+    // carry this page's edits, so [_updated] is only dropped once they land.
+    final feeds = Future.wait([
+      _forms.refresh(),
+      _responses.refresh(),
+    ]).then((_) => _updated.clear());
     await runOrToast(
       context,
       () => (_loadSummaryAndDrafts(), _app.refreshMembers()).wait,
