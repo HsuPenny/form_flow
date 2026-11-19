@@ -20,8 +20,28 @@ abstract interface class FormRepository {
   /// Department names a profile can be assigned to, in display order.
   Future<List<String>> fetchDepartments();
 
-  /// All forms visible to the signed-in user, newest first.
-  Future<List<FormItem>> fetchForms();
+  /// Every draft, newest first, for 表單管理's 草稿 tab. Drafts are few and
+  /// short-lived, so they come in one go.
+  Future<List<FormItem>> fetchDrafts();
+
+  /// Up to [limit] published (not draft) forms, newest first, skipping the
+  /// first [offset]; [query] filters by title. For 表單管理's 完成進度.
+  Future<PageResult<FormItem>> fetchPublishedForms({
+    String query = '',
+    int offset = 0,
+    int limit = PageResult.size,
+  });
+
+  /// Up to [limit] replies across every form, newest first, skipping the
+  /// first [offset]; [query] filters by form title. For 表單管理's 最新回覆.
+  Future<PageResult<ResponseEntry>> fetchResponses({
+    String query = '',
+    int offset = 0,
+    int limit = PageResult.size,
+  });
+
+  /// Totals over every published form; see [ProgressSummary].
+  Future<ProgressSummary> fetchProgressSummary();
 
   /// Up to [limit] forms assigned to [memberId] in [kind], skipping the
   /// first [offset]. [FormCategory.pending] comes soonest deadline first,

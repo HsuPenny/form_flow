@@ -32,7 +32,6 @@ void main() {
         ),
       );
     }
-    await state.refreshForms();
 
     await tester.pumpWidget(MyApp(state: state));
     await tester.pumpAndSettle();
@@ -88,8 +87,6 @@ void main() {
         ),
       );
     }
-    await state.refreshForms();
-    expect(state.forms, isEmpty);
 
     // Soonest deadline first, 20 at a time.
     final first = await state.fetchMyForms(FormCategory.pending);

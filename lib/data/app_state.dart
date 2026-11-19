@@ -49,15 +49,10 @@ class AppState extends ChangeNotifier {
   bool _restoring = false;
   UserProfile? _profile;
   List<Member> _members = [];
-  List<FormItem> _forms = [];
   List<String> _departments = [];
 
   List<Member> get members => UnmodifiableListView(_members);
   List<String> get departments => UnmodifiableListView(_departments);
-
-  /// Every form, for 表單管理. Only admins load it; members' pages ask the
-  /// backend for one [FormCategory] batch at a time ([fetchMyForms]).
-  List<FormItem> get forms => UnmodifiableListView(_forms);
 
   /// Kept after logout so the shell can still render while it animates out.
   Role? get role => _profile?.role;
@@ -135,9 +130,10 @@ class AppState extends ChangeNotifier {
 
   Future<void> _enter(UserProfile profile) async {
     _profile = profile;
-    final (members, forms, departments) = await (
+    // Forms aren't loaded here: every page asks the backend for just the
+    // batch it shows (see [fetchMyForms], [fetchPublishedForms]).
+    final (members, departments) = await (
       _formRepo.fetchMembers(),
-      _fetchAllForms(profile.role),
       // Only the settings dropdown needs these; don't block sign-in on them.
       _formRepo.fetchDepartments().catchError((Object e) {
         debugPrint('Could not load departments: $e');
@@ -145,16 +141,10 @@ class AppState extends ChangeNotifier {
       }),
     ).wait;
     _members = members;
-    _forms = forms;
     _departments = departments;
     _signedIn = true;
     notifyListeners();
   }
-
-  /// 只有管理員的表單管理需要全部表單；成員的畫面都依分類分批向後端要，
-  /// 登入與重新整理時就不必整包下載。
-  Future<List<FormItem>> _fetchAllForms(Role? role) async =>
-      role == Role.admin ? _formRepo.fetchForms() : <FormItem>[];
 
   Future<void> changePassword({
     required String currentPassword,
@@ -188,27 +178,19 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Creates [form], or updates the existing form with the same id.
-  Future<void> saveForm(FormItem form) async {
-    _putForm(await _formRepo.saveForm(form));
-    notifyListeners();
-  }
+  /// Creates [form], or updates the existing form with the same id, and
+  /// returns it as saved.
+  ///
+  /// AppState keeps no list of forms, so the form write methods hand the
+  /// updated form back and the page showing it swaps it in.
+  Future<FormItem> saveForm(FormItem form) => _formRepo.saveForm(form);
 
-  Future<void> deleteForm(FormItem form) async {
-    await _formRepo.deleteForm(form.id);
-    _forms.removeWhere((f) => f.id == form.id);
-    notifyListeners();
-  }
+  Future<void> deleteForm(FormItem form) => _formRepo.deleteForm(form.id);
 
-  /// Reloads forms and members, e.g. to pick up newly assigned forms and
-  /// other people's replies.
-  Future<void> refreshForms() async {
-    final (members, forms) = await (
-      _formRepo.fetchMembers(),
-      _fetchAllForms(role),
-    ).wait;
-    _members = members;
-    _forms = forms;
+  /// Reloads the member directory, e.g. to pick up people who just joined.
+  /// Pages reload their own forms.
+  Future<void> refreshMembers() async {
+    _members = await _formRepo.fetchMembers();
     notifyListeners();
   }
 
@@ -226,35 +208,41 @@ class AppState extends ChangeNotifier {
     limit: limit,
   );
 
-  Future<void> addRecipients(FormItem form, List<Member> members) async {
-    _putForm(await _formRepo.addRecipients(form.id, members));
-    notifyListeners();
-  }
+  /// 草稿 for 表單管理, all at once; see [FormRepository.fetchDrafts].
+  Future<List<FormItem>> fetchDrafts() => _formRepo.fetchDrafts();
 
-  Future<void> extendDeadline(FormItem form, DateTime deadline) async {
-    _putForm(await _formRepo.extendDeadline(form.id, deadline));
-    notifyListeners();
-  }
+  /// One batch of 完成進度; see [FormRepository.fetchPublishedForms].
+  Future<PageResult<FormItem>> fetchPublishedForms({
+    String query = '',
+    int offset = 0,
+    int limit = PageResult.size,
+  }) =>
+      _formRepo.fetchPublishedForms(query: query, offset: offset, limit: limit);
 
-  Future<void> closeForm(FormItem form) async {
-    _putForm(await _formRepo.closeForm(form.id));
-    notifyListeners();
-  }
+  /// One batch of 最新回覆; see [FormRepository.fetchResponses].
+  Future<PageResult<ResponseEntry>> fetchResponses({
+    String query = '',
+    int offset = 0,
+    int limit = PageResult.size,
+  }) => _formRepo.fetchResponses(query: query, offset: offset, limit: limit);
 
-  Future<void> submitResponse(FormItem form, Answers answers) async {
-    final response = FormResponse(
-      member: me,
-      submittedAt: DateTime.now(),
-      answers: answers,
-    );
-    _putForm(await _formRepo.submitResponse(form.id, response));
-    notifyListeners();
-  }
+  Future<ProgressSummary> fetchProgressSummary() =>
+      _formRepo.fetchProgressSummary();
 
-  void _putForm(FormItem form) {
-    final i = _forms.indexWhere((f) => f.id == form.id);
-    i < 0 ? _forms.insert(0, form) : _forms[i] = form;
-  }
+  /// The write methods below return the updated form; see [saveForm].
+  Future<FormItem> addRecipients(FormItem form, List<Member> members) =>
+      _formRepo.addRecipients(form.id, members);
+
+  Future<FormItem> extendDeadline(FormItem form, DateTime deadline) =>
+      _formRepo.extendDeadline(form.id, deadline);
+
+  Future<FormItem> closeForm(FormItem form) => _formRepo.closeForm(form.id);
+
+  Future<FormItem> submitResponse(FormItem form, Answers answers) =>
+      _formRepo.submitResponse(
+        form.id,
+        FormResponse(member: me, submittedAt: DateTime.now(), answers: answers),
+      );
 }
 
 /// Exposes [AppState] to the widget tree and rebuilds dependents on change.

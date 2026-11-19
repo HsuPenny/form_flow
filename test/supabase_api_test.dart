@@ -118,6 +118,17 @@ class FakeSupabase implements HttpClientAdapter {
           },
         ),
       ('GET', '/rest/v1/forms') => _json([_form]),
+      ('GET', '/rest/v1/responses') => _json(
+        [_responseRow],
+        200,
+        {
+          'content-range': ['0-0/45'],
+        },
+      ),
+      ('POST', '/rest/v1/rpc/progress_summary') when single => _json({
+        'recipients': 12,
+        'responded': 5,
+      }),
       ('POST', '/rest/v1/rpc/save_form') => ResponseBody.fromString('', 204),
       _ => _json({
         'message': 'unexpected ${options.method} ${options.path}',
@@ -172,6 +183,22 @@ class FakeSupabase implements HttpClientAdapter {
         'profiles': {'id': 'u2', 'display_name': '林郁婷', 'department': '產品設計'},
       },
     ],
+  };
+
+  /// A row of `/rest/v1/responses` as 最新回覆 selects it: the form comes
+  /// with its own columns only.
+  static const _responseRow = {
+    'answers': {'0': '好'},
+    'submitted_at': '2026-09-28T02:00:00+00:00',
+    'profiles': {'id': 'u2', 'display_name': '林郁婷', 'department': '產品設計'},
+    'forms': {
+      'id': 'f1',
+      'title': '工作坊回饋',
+      'description': '',
+      'deadline': '2026-10-20',
+      'status': 'pending',
+      'questions': [],
+    },
   };
 
   static ResponseBody _json(
@@ -244,7 +271,7 @@ void main() {
     server.revokedTokens.add('access1');
 
     final results = await Future.wait([
-      forms.fetchForms(),
+      forms.fetchDrafts(),
       forms.fetchMembers(),
     ]);
     expect(results, everyElement(hasLength(1)));
@@ -390,7 +417,7 @@ void main() {
 
   test('form rows map to models', () async {
     await auth.signIn(email: 'lisa@example.com', password: 'secret');
-    final form = (await forms.fetchForms()).single;
+    final form = (await forms.fetchDrafts()).single;
 
     expect(form.deadline, DateTime(2026, 10, 20));
     expect(form.status, FormStatus.pending);
@@ -465,9 +492,89 @@ void main() {
     expect(q.containsKey('title'), isFalse);
   });
 
+  test('drafts come in one go, newest first', () async {
+    await auth.signIn(email: 'lisa@example.com', password: 'secret');
+    await forms.fetchDrafts();
+
+    final q = server.requests.last.queryParameters;
+    expect(q['status'], 'eq.draft');
+    expect(q['order'], 'created_at.desc,id.desc');
+    expect(q.containsKey('limit'), isFalse);
+  });
+
+  test('完成進度 asks for published forms in batches, newest first', () async {
+    await auth.signIn(email: 'lisa@example.com', password: 'secret');
+    final page = await forms.fetchPublishedForms(query: ' 回饋 ', offset: 20);
+
+    expect(page.items.single.title, '工作坊回饋');
+    expect(page.total, 31);
+    final req = server.requests.last;
+    expect(req.headers['Prefer'], 'count=exact');
+    final q = req.queryParameters;
+    expect(q['status'], 'neq.draft');
+    expect(q['title'], 'ilike.*回饋*');
+    expect(q['order'], 'created_at.desc,id.desc');
+    expect(q['offset'], 20);
+    expect(q['limit'], PageResult.size);
+  });
+
+  test('完成進度 without a search sends no title filter', () async {
+    await auth.signIn(email: 'lisa@example.com', password: 'secret');
+    await forms.fetchPublishedForms(query: '  ', limit: 5);
+
+    final q = server.requests.last.queryParameters;
+    expect(q.containsKey('title'), isFalse);
+    expect(q['offset'], 0);
+    expect(q['limit'], 5);
+  });
+
+  test('最新回覆 pages through every reply, newest first', () async {
+    await auth.signIn(email: 'lisa@example.com', password: 'secret');
+    final page = await forms.fetchResponses(query: ' 回饋 ', offset: 40);
+
+    expect(page.total, 45);
+    final entry = page.items.single;
+    expect(entry.form.title, '工作坊回饋');
+    expect(entry.form.responses, isEmpty);
+    expect(entry.response.member.name, '林郁婷');
+    expect(entry.response.answers[0], '好');
+
+    final req = server.requests.last;
+    expect(req.path, '/rest/v1/responses');
+    expect(req.headers['Prefer'], 'count=exact');
+    final q = req.queryParameters;
+    expect(q['order'], 'submitted_at.desc,id.desc');
+    expect(q['offset'], 40);
+    expect(q['limit'], PageResult.size);
+    // Searched by form title on the server, through an inner join.
+    expect(q['forms.title'], 'ilike.*回饋*');
+    expect(q['select'], contains('forms!responses_form_id_fkey!inner('));
+    expect(q['select'], isNot(contains(' ')));
+  });
+
+  test('最新回覆 without a search sends no title filter', () async {
+    await auth.signIn(email: 'lisa@example.com', password: 'secret');
+    await forms.fetchResponses();
+
+    final q = server.requests.last.queryParameters;
+    expect(q.containsKey('forms.title'), isFalse);
+    expect(q['offset'], 0);
+  });
+
+  test('the totals come from the progress_summary RPC', () async {
+    await auth.signIn(email: 'lisa@example.com', password: 'secret');
+    final summary = await forms.fetchProgressSummary();
+
+    expect(summary.recipients, 12);
+    expect(summary.responded, 5);
+    expect(summary.waiting, 7);
+    expect(summary.percent, 42);
+    expect(server.requests.last.method, 'POST');
+  });
+
   test('saving a form calls the save_form RPC', () async {
     await auth.signIn(email: 'lisa@example.com', password: 'secret');
-    final form = (await forms.fetchForms()).single;
+    final form = (await forms.fetchDrafts()).single;
     await forms.saveForm(form);
 
     final rpc = server.requests.firstWhere(
