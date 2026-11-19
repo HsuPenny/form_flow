@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 
 import '../models.dart';
+import '../paged_feed.dart';
 import 'form_repository.dart';
 
 /// [FormRepository] backed by the Supabase tables in `supabase/migrations`,
@@ -61,6 +62,60 @@ class SupabaseFormRepository implements FormRepository {
   }
 
   @override
+  Future<PageResult<FormItem>> fetchMyForms({
+    required String memberId,
+    required FormCategory kind,
+    String query = '',
+    int offset = 0,
+    int limit = PageResult.size,
+  }) async {
+    // Extra aliased embeds only filter: `mine` keeps forms assigned to the
+    // member (admins can see every form), `answered` is their own response.
+    final answered = kind == FormCategory.completed
+        ? 'answered:responses!responses_form_id_fkey!inner(member_id)'
+        : 'answered:responses!responses_form_id_fkey(member_id)';
+    final q = query.trim();
+    // Same rule as form_is_open: replies are taken through the end of the
+    // deadline day.
+    final today = formatDate(DateTime.now());
+    final res = await _dio.get<List<dynamic>>(
+      '/rest/v1/forms',
+      queryParameters: {
+        'select':
+            '$_formColumns,'
+            'mine:form_recipients!form_recipients_form_id_fkey!inner(member_id),'
+            '$answered',
+        'mine.member_id': 'eq.$memberId',
+        'answered.member_id': 'eq.$memberId',
+        if (kind == FormCategory.pending) ...{
+          'answered': 'is.null',
+          'status': 'in.(pending,completed)',
+          'deadline': 'gte.$today',
+        },
+        if (kind == FormCategory.expired) ...{
+          'answered': 'is.null',
+          'status': 'neq.draft',
+          'or': '(status.eq.closed,deadline.lt.$today)',
+        },
+        if (q.isNotEmpty) 'title': 'ilike.*$q*',
+        'order': kind == FormCategory.pending
+            ? 'deadline.asc,id.asc'
+            : 'deadline.desc,id.desc',
+        'offset': offset,
+        'limit': limit,
+      },
+      options: Options(headers: {'Prefer': 'count=exact'}),
+    );
+    final items = [
+      for (final r in res.data!) _formFrom(r as Map<String, dynamic>),
+    ];
+    // "0-19/57", or "*/0" when nothing matches.
+    final range = res.headers.value('content-range');
+    final total = int.tryParse(range?.split('/').last ?? '');
+    return PageResult(items, total ?? offset + items.length);
+  }
+
+  @override
   Future<FormItem> saveForm(FormItem form) async {
     await _dio.post<void>(
       '/rest/v1/rpc/save_form',
@@ -108,10 +163,7 @@ class SupabaseFormRepository implements FormRepository {
 
   @override
   Future<FormItem> closeForm(String formId) async {
-    await _dio.post<void>(
-      '/rest/v1/rpc/close_form',
-      data: {'form_id': formId},
-    );
+    await _dio.post<void>('/rest/v1/rpc/close_form', data: {'form_id': formId});
     return _fetchForm(formId);
   }
 

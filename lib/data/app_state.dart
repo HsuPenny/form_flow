@@ -4,6 +4,7 @@ import 'package:flutter/material.dart' show ThemeMode;
 import 'package:flutter/widgets.dart';
 
 import 'models.dart';
+import 'paged_feed.dart';
 import 'repositories/auth_repository.dart';
 import 'repositories/form_repository.dart';
 import 'theme_mode_store.dart';
@@ -53,6 +54,9 @@ class AppState extends ChangeNotifier {
 
   List<Member> get members => UnmodifiableListView(_members);
   List<String> get departments => UnmodifiableListView(_departments);
+
+  /// Every form, for 表單管理. Only admins load it; members' pages ask the
+  /// backend for one [FormCategory] batch at a time ([fetchMyForms]).
   List<FormItem> get forms => UnmodifiableListView(_forms);
 
   /// Kept after logout so the shell can still render while it animates out.
@@ -133,7 +137,7 @@ class AppState extends ChangeNotifier {
     _profile = profile;
     final (members, forms, departments) = await (
       _formRepo.fetchMembers(),
-      _formRepo.fetchForms(),
+      _fetchAllForms(profile.role),
       // Only the settings dropdown needs these; don't block sign-in on them.
       _formRepo.fetchDepartments().catchError((Object e) {
         debugPrint('Could not load departments: $e');
@@ -146,6 +150,11 @@ class AppState extends ChangeNotifier {
     _signedIn = true;
     notifyListeners();
   }
+
+  /// 只有管理員的表單管理需要全部表單；成員的畫面都依分類分批向後端要，
+  /// 登入與重新整理時就不必整包下載。
+  Future<List<FormItem>> _fetchAllForms(Role? role) async =>
+      role == Role.admin ? _formRepo.fetchForms() : <FormItem>[];
 
   Future<void> changePassword({
     required String currentPassword,
@@ -196,12 +205,26 @@ class AppState extends ChangeNotifier {
   Future<void> refreshForms() async {
     final (members, forms) = await (
       _formRepo.fetchMembers(),
-      _formRepo.fetchForms(),
+      _fetchAllForms(role),
     ).wait;
     _members = members;
     _forms = forms;
     notifyListeners();
   }
+
+  /// One batch of the signed-in user's [kind] forms; see [FormCategory].
+  Future<PageResult<FormItem>> fetchMyForms(
+    FormCategory kind, {
+    String query = '',
+    int offset = 0,
+    int limit = PageResult.size,
+  }) => _formRepo.fetchMyForms(
+    memberId: me.id,
+    kind: kind,
+    query: query,
+    offset: offset,
+    limit: limit,
+  );
 
   Future<void> addRecipients(FormItem form, List<Member> members) async {
     _putForm(await _formRepo.addRecipients(form.id, members));
