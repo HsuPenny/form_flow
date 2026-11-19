@@ -20,6 +20,7 @@ enum BrandGlyph {
   verified,
   swap,
   lock,
+  moon,
   logout;
 
   /// Whether the glyph has its own outline and banner-edge drawings.
@@ -262,6 +263,11 @@ class _BrandIconPainter extends CustomPainter {
         canvas.drawRRect(_rr(4, 10, 16, 12, 3.5), p);
         canvas.drawCircle(const Offset(12, 15), 1.9, _clear);
         canvas.drawRRect(_rr(11.1, 15, 1.8, 3.8, 0.9), _clear);
+      case BrandGlyph.moon:
+        // A crescent: a full disc with an offset disc cut out of it.
+        canvas.drawCircle(const Offset(11, 13), 8.5, p);
+        canvas.drawCircle(const Offset(16, 8.5), 6.5, _clear);
+        paintSparkle(canvas, const Offset(19.5, 4.5), 3.4, p);
       case BrandGlyph.logout:
         canvas.drawRRect(_rr(3, 3, 10, 18, 3), p);
         final bar = _rr(9, 10.3, 9, 3.4, 1.7);

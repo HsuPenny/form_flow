@@ -68,11 +68,11 @@ class RecipientField extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 if (selected.isEmpty)
-                  const Text(
+                  Text(
                     '尚未選擇對象',
                     style: TextStyle(
                       fontSize: 12,
-                      color: AppColors.mutedForeground,
+                      color: context.colors.mutedForeground,
                     ),
                   )
                 else
@@ -103,9 +103,9 @@ class RecipientField extends StatelessWidget {
             padding: const EdgeInsets.only(left: 30, top: 4),
             child: Text(
               '共 ${allMembers.length} 人',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 12,
-                color: AppColors.mutedForeground,
+                color: context.colors.mutedForeground,
               ),
             ),
           ),
@@ -145,16 +145,20 @@ class _Chip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final fg = department ? AppColors.primaryDeep : AppColors.foreground;
+    final fg = department
+        ? context.colors.primaryDeep
+        : context.colors.foreground;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
       decoration: BoxDecoration(
-        color: department ? AppColors.primarySoft : AppColors.secondary,
+        color: department
+            ? context.colors.primarySoft
+            : context.colors.secondary,
         borderRadius: BorderRadius.circular(999),
         border: Border.all(
           color: department
-              ? AppColors.primary.withValues(alpha: 0.3)
-              : AppColors.border,
+              ? context.colors.primary.withValues(alpha: 0.3)
+              : context.colors.border,
         ),
       ),
       child: Row(
@@ -187,7 +191,7 @@ Future<List<Member>?> showRecipientPicker(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
-    backgroundColor: Colors.white,
+    backgroundColor: context.colors.card,
     constraints: const BoxConstraints(maxWidth: 560),
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -290,7 +294,7 @@ class _RecipientPickerSheetState extends State<RecipientPickerSheet> {
             width: 36,
             height: 4,
             decoration: BoxDecoration(
-              color: AppColors.input,
+              color: context.colors.input,
               borderRadius: BorderRadius.circular(999),
             ),
           ),
@@ -308,7 +312,7 @@ class _RecipientPickerSheetState extends State<RecipientPickerSheet> {
                       ? null
                       : () => setState(_selected.clear),
                   style: TextButton.styleFrom(
-                    foregroundColor: AppColors.primaryDeep,
+                    foregroundColor: context.colors.primaryDeep,
                   ),
                   child: const Text('清除'),
                 ),
@@ -329,12 +333,12 @@ class _RecipientPickerSheetState extends State<RecipientPickerSheet> {
           const Divider(height: 1),
           Expanded(
             child: rows.isEmpty
-                ? const Center(
+                ? Center(
                     child: Text(
                       '找不到符合的部門或人員',
                       style: TextStyle(
                         fontSize: 12,
-                        color: AppColors.mutedForeground,
+                        color: context.colors.mutedForeground,
                       ),
                     ),
                   )
@@ -397,8 +401,8 @@ class _DepartmentRow extends StatelessWidget {
         : '${members.length} 人';
 
     return DecoratedBox(
-      decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: AppColors.border)),
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: context.colors.border)),
       ),
       child: InkWell(
         onTap: onToggleExpand,
@@ -411,10 +415,10 @@ class _DepartmentRow extends StatelessWidget {
                 value: all ? true : (count > 0 ? null : false),
                 onChanged: (_) => onToggleSelect(),
               ),
-              const Icon(
+              Icon(
                 Icons.group_outlined,
                 size: 18,
-                color: AppColors.primary,
+                color: context.colors.primary,
               ),
               const SizedBox(width: 8),
               Expanded(
@@ -431,15 +435,15 @@ class _DepartmentRow extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 12,
                   color: count > 0
-                      ? AppColors.foreground
-                      : AppColors.mutedForeground,
+                      ? context.colors.foreground
+                      : context.colors.mutedForeground,
                 ),
               ),
               const SizedBox(width: 4),
               Icon(
                 expanded ? Icons.expand_less : Icons.expand_more,
                 size: 18,
-                color: AppColors.mutedForeground,
+                color: context.colors.mutedForeground,
               ),
             ],
           ),
@@ -463,13 +467,13 @@ class _MemberRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: AppColors.sidebar,
+      color: context.colors.sidebar,
       child: InkWell(
         onTap: onTap,
         child: Container(
           padding: const EdgeInsets.fromLTRB(34, 2, 16, 2),
-          decoration: const BoxDecoration(
-            border: Border(bottom: BorderSide(color: AppColors.border)),
+          decoration: BoxDecoration(
+            border: Border(bottom: BorderSide(color: context.colors.border)),
           ),
           child: Row(
             children: [

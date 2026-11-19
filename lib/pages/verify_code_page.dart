@@ -139,7 +139,7 @@ class _VerifyCodePageState extends State<VerifyCodePage> {
     final changeEmail = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: Colors.white,
+        backgroundColor: context.colors.card,
         title: const Text('收不到驗證碼？', style: TextStyle(fontSize: 18)),
         content: Text(
           '・看看垃圾郵件匣或促銷郵件分類\n'
@@ -182,16 +182,16 @@ class _VerifyCodePageState extends State<VerifyCodePage> {
           const SizedBox(height: 10),
           Text(
             _hint,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12,
               height: 1.5,
-              color: AppColors.mutedForeground,
+              color: context.colors.mutedForeground,
             ),
           ),
           const SizedBox(height: 20),
           Center(child: _busy ? _spinner() : _resendButton()),
           const SizedBox(height: 12),
-          const Divider(height: 1, color: AppColors.border),
+          Divider(height: 1, color: context.colors.border),
           const SizedBox(height: 4),
           Center(
             child: TextButton(

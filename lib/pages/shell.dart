@@ -158,7 +158,7 @@ class AppShellState extends State<AppShell> {
 }
 
 /// The page background: soft peach, apricot and rose blobs on
-/// [AppColors.background], sized from the screen's short side so they look
+/// [context.colors.background], sized from the screen's short side so they look
 /// the same on phones and wide windows.
 class _FluidBackground extends StatelessWidget {
   const _FluidBackground({required this.child});
@@ -181,23 +181,23 @@ class _FluidBackground extends StatelessWidget {
     );
 
     return ColoredBox(
-      color: AppColors.background,
+      color: context.colors.background,
       child: Stack(
         children: [
           Positioned(
             top: -d * 0.45,
             right: -d * 0.45,
-            child: blob(const Color(0xCCFFC9A3), d * 1.3),
+            child: blob(context.colors.blobs[0], d * 1.3),
           ),
           Positioned(
             top: d * 0.55,
             left: -d * 0.6,
-            child: blob(const Color(0xFFFFE0C2), d * 1.1),
+            child: blob(context.colors.blobs[1], d * 1.1),
           ),
           Positioned(
             bottom: -d * 0.4,
             right: -d * 0.35,
-            child: blob(const Color(0xCCFFD6D0), d * 1.1),
+            child: blob(context.colors.blobs[2], d * 1.1),
           ),
           Positioned.fill(child: child),
         ],
@@ -222,9 +222,9 @@ class _Sidebar extends StatelessWidget {
     final app = AppScope.of(context);
     return Container(
       width: 248,
-      decoration: const BoxDecoration(
-        color: AppColors.sidebar,
-        border: Border(right: BorderSide(color: AppColors.border)),
+      decoration: BoxDecoration(
+        color: context.colors.sidebar,
+        border: Border(right: BorderSide(color: context.colors.border)),
       ),
       padding: const EdgeInsets.fromLTRB(16, 22, 16, 20),
       child: Column(
@@ -247,14 +247,14 @@ class _Sidebar extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 24),
-          for (final s in sections) _navItem(s),
+          for (final s in sections) _navItem(context, s),
           const Spacer(),
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: context.colors.card,
               borderRadius: BorderRadius.circular(AppRadius.sm),
-              border: Border.all(color: AppColors.border),
+              border: Border.all(color: context.colors.border),
             ),
             child: Row(
               children: [
@@ -272,9 +272,9 @@ class _Sidebar extends StatelessWidget {
                     ),
                     Text(
                       app.role!.label,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 11,
-                        color: AppColors.mutedForeground,
+                        color: context.colors.mutedForeground,
                       ),
                     ),
                   ],
@@ -293,12 +293,12 @@ class _Sidebar extends StatelessWidget {
     );
   }
 
-  Widget _navItem(AppSection s) {
+  Widget _navItem(BuildContext context, AppSection s) {
     final selected = s == current;
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
       child: Material(
-        color: selected ? AppColors.muted : Colors.transparent,
+        color: selected ? context.colors.muted : Colors.transparent,
         borderRadius: BorderRadius.circular(AppRadius.sm),
         child: InkWell(
           borderRadius: BorderRadius.circular(AppRadius.sm),
@@ -309,7 +309,7 @@ class _Sidebar extends StatelessWidget {
               borderRadius: BorderRadius.circular(AppRadius.sm),
               border: Border(
                 left: BorderSide(
-                  color: selected ? AppColors.primary : Colors.transparent,
+                  color: selected ? context.colors.primary : Colors.transparent,
                   width: 2,
                 ),
               ),
@@ -320,8 +320,8 @@ class _Sidebar extends StatelessWidget {
                   s.icon,
                   size: 18,
                   color: selected
-                      ? AppColors.primaryDeep
-                      : AppColors.foreground,
+                      ? context.colors.primaryDeep
+                      : context.colors.foreground,
                   fill: selected ? 1 : 0,
                 ),
                 const SizedBox(width: 10),
@@ -368,12 +368,12 @@ class _BottomBar extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(6),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.95),
+          color: context.colors.card.withValues(alpha: 0.95),
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: AppColors.border),
+          border: Border.all(color: context.colors.border),
           boxShadow: [
             BoxShadow(
-              color: AppColors.foreground.withValues(alpha: 0.1),
+              color: Colors.black.withValues(alpha: 0.1),
               blurRadius: 20,
               offset: const Offset(0, 6),
             ),
@@ -391,7 +391,7 @@ class _BottomBar extends StatelessWidget {
                   heightFactor: 1,
                   child: DecoratedBox(
                     decoration: BoxDecoration(
-                      color: AppColors.primarySoft,
+                      color: context.colors.navIndicator,
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
@@ -413,8 +413,8 @@ class _BottomBar extends StatelessWidget {
                         tween: Tween(end: s == current ? 1 : 0),
                         builder: (context, t, _) {
                           final color = Color.lerp(
-                            AppColors.foreground,
-                            AppColors.primaryDeep,
+                            context.colors.foreground,
+                            context.colors.primaryDeep,
                             t,
                           );
                           return Padding(
