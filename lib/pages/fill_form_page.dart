@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../data/app_state.dart';
 import '../data/models.dart';
+import '../data/paged_feed.dart';
+import '../data/repositories/form_repository.dart';
 import '../theme/app_theme.dart';
 import '../widgets/common.dart';
 import '../widgets/form_renderer.dart';
@@ -325,7 +327,7 @@ class _BannerProgress extends StatelessWidget {
 }
 
 /// Thank-you screen shown after submitting, with the next form to fill.
-class _Done extends StatelessWidget {
+class _Done extends StatefulWidget {
   const _Done({required this.form, required this.updated});
 
   final FormItem form;
@@ -334,22 +336,35 @@ class _Done extends StatelessWidget {
   final bool updated;
 
   @override
+  State<_Done> createState() => _DoneState();
+}
+
+class _DoneState extends State<_Done> {
+  /// 下一份待填：只向後端要截止日最近的 1 份，連同總共還剩幾份。
+  /// 剛送出的這份已有回覆，所以不會再出現在待完成裡。
+  PageResult<FormItem>? _todo;
+  bool _asked = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_asked) return;
+    _asked = true;
+    AppScope.of(context).fetchMyForms(FormCategory.pending, limit: 1).then(
+      (page) {
+        if (mounted) setState(() => _todo = page);
+      },
+      // Just leaves out the next-form card.
+      onError: (Object e) => debugPrint('Could not load next form: $e'),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final app = AppScope.of(context);
     final nav = ShellNav.of(context);
-    final me = app.me;
-    final todo =
-        app.forms
-            .where(
-              (f) =>
-                  f != form &&
-                  f.recipients.contains(me) &&
-                  f.isOpen &&
-                  f.statusFor(me) == FormStatus.pending,
-            )
-            .toList()
-          ..sort((a, b) => a.deadline.compareTo(b.deadline));
-    final next = todo.isEmpty ? null : todo.first;
+    final form = widget.form;
+    final updated = widget.updated;
+    final next = _todo?.items.firstOrNull;
 
     return Center(
       child: SingleChildScrollView(
@@ -399,7 +414,7 @@ class _Done extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '還有 ${todo.length} 份待填寫',
+                        '還有 ${_todo!.total} 份待填寫',
                         style: TextStyle(
                           fontSize: 11,
                           color: context.colors.mutedForeground,

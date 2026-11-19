@@ -4,7 +4,9 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:flutter_form_flow/data/api/api_client.dart';
 import 'package:flutter_form_flow/data/models.dart';
+import 'package:flutter_form_flow/data/paged_feed.dart';
 import 'package:flutter_form_flow/data/repositories/auth_repository.dart';
+import 'package:flutter_form_flow/data/repositories/form_repository.dart';
 import 'package:flutter_form_flow/data/repositories/supabase_auth_repository.dart';
 import 'package:flutter_form_flow/data/repositories/supabase_form_repository.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -105,6 +107,16 @@ class FakeSupabase implements HttpClientAdapter {
         {'name': '工程部'},
       ]),
       ('GET', '/rest/v1/forms') when single => _json(_form),
+      // A batch of a longer list: total in Content-Range.
+      ('GET', '/rest/v1/forms')
+          when options.headers['Prefer'] == 'count=exact' =>
+        _json(
+          [_form],
+          200,
+          {
+            'content-range': ['20-20/31'],
+          },
+        ),
       ('GET', '/rest/v1/forms') => _json([_form]),
       ('POST', '/rest/v1/rpc/save_form') => ResponseBody.fromString('', 204),
       _ => _json({
@@ -162,14 +174,18 @@ class FakeSupabase implements HttpClientAdapter {
     ],
   };
 
-  static ResponseBody _json(Object data, [int status = 200]) =>
-      ResponseBody.fromString(
-        jsonEncode(data),
-        status,
-        headers: {
-          Headers.contentTypeHeader: ['application/json; charset=utf-8'],
-        },
-      );
+  static ResponseBody _json(
+    Object data, [
+    int status = 200,
+    Map<String, List<String>> headers = const {},
+  ]) => ResponseBody.fromString(
+    jsonEncode(data),
+    status,
+    headers: {
+      Headers.contentTypeHeader: ['application/json; charset=utf-8'],
+      ...headers,
+    },
+  );
 
   @override
   void close({bool force = false}) {}
@@ -388,6 +404,65 @@ void main() {
 
     final select = server.requests.last.queryParameters['select'] as String;
     expect(select, isNot(contains(' ')));
+  });
+
+  test('expired history asks for unanswered, ended forms in batches', () async {
+    await auth.signIn(email: 'lisa@example.com', password: 'secret');
+    final page = await forms.fetchMyForms(
+      memberId: 'u1',
+      kind: FormCategory.expired,
+      query: ' 回饋 ',
+      offset: 20,
+    );
+
+    expect(page.items.single.title, '工作坊回饋');
+    expect(page.total, 31);
+    final q = server.requests.last.queryParameters;
+    expect(q['mine.member_id'], 'eq.u1');
+    expect(q['answered.member_id'], 'eq.u1');
+    expect(q['answered'], 'is.null');
+    expect(q['status'], 'neq.draft');
+    expect(q['or'], startsWith('(status.eq.closed,deadline.lt.'));
+    expect(q['title'], 'ilike.*回饋*');
+    expect(q['offset'], 20);
+    expect(q['limit'], PageResult.size);
+    expect(q['select'], isNot(contains(' ')));
+    // Left join, so forms without the member's response stay in.
+    expect(
+      q['select'],
+      endsWith('answered:responses!responses_form_id_fkey(member_id)'),
+    );
+  });
+
+  test('pending asks for open, unanswered forms, soonest first', () async {
+    await auth.signIn(email: 'lisa@example.com', password: 'secret');
+    await forms.fetchMyForms(
+      memberId: 'u1',
+      kind: FormCategory.pending,
+      limit: 1,
+    );
+
+    final q = server.requests.last.queryParameters;
+    expect(q['answered'], 'is.null');
+    expect(q['status'], 'in.(pending,completed)');
+    expect(q['deadline'], startsWith('gte.'));
+    expect(q['order'], 'deadline.asc,id.asc');
+    expect(q['limit'], 1);
+    expect(q.containsKey('or'), isFalse);
+  });
+
+  test('completed history requires the member\'s own response', () async {
+    await auth.signIn(email: 'lisa@example.com', password: 'secret');
+    await forms.fetchMyForms(memberId: 'u1', kind: FormCategory.completed);
+
+    final q = server.requests.last.queryParameters;
+    expect(
+      q['select'],
+      endsWith('responses!responses_form_id_fkey!inner(member_id)'),
+    );
+    expect(q.containsKey('answered'), isFalse);
+    expect(q.containsKey('or'), isFalse);
+    expect(q.containsKey('title'), isFalse);
   });
 
   test('saving a form calls the save_form RPC', () async {

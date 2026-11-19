@@ -4,6 +4,7 @@ import 'package:custom_refresh_indicator/custom_refresh_indicator.dart';
 import 'package:flutter/material.dart';
 
 import '../data/models.dart';
+import '../data/paged_feed.dart';
 import '../theme/app_theme.dart';
 import 'brand_icons.dart';
 
@@ -1177,12 +1178,19 @@ class ListPageBody extends StatelessWidget {
     required this.header,
     required this.list,
     required this.onRefresh,
+    this.onNearEnd,
     this.maxWidth = 1100,
   });
 
   final Widget header;
   final Widget list;
   final RefreshCallback onRefresh;
+
+  /// Called while the list is scrolled to within a screen of its end, e.g.
+  /// [PagedFeed.loadMore] for a list that loads in batches; pair it with a
+  /// [PagedFeedFooter] at the end of [list]. May fire repeatedly, so it
+  /// should ignore calls while a batch is loading (loadMore does).
+  final VoidCallback? onNearEnd;
   final double maxWidth;
 
   @override
@@ -1207,16 +1215,79 @@ class ListPageBody extends StatelessWidget {
             onRefresh: onRefresh,
             builder: (context, child, controller) =>
                 _PullToRefreshFrame(controller: controller, child: child),
-            child: SingleChildScrollView(
-              // Pullable even when the list is too short to scroll.
-              physics: const AlwaysScrollableScrollPhysics(),
-              // Room for the floating bottom navigation on narrow screens.
-              padding: EdgeInsets.fromLTRB(side, 0, side, wide ? 48 : 110),
-              child: constrained(list),
+            child: NotificationListener<ScrollNotification>(
+              onNotification: (n) {
+                if (onNearEnd != null &&
+                    n.metrics.axis == Axis.vertical &&
+                    n.metrics.extentAfter < n.metrics.viewportDimension) {
+                  onNearEnd!();
+                }
+                return false;
+              },
+              child: SingleChildScrollView(
+                // Pullable even when the list is too short to scroll.
+                physics: const AlwaysScrollableScrollPhysics(),
+                // Room for the floating bottom navigation on narrow screens.
+                padding: EdgeInsets.fromLTRB(side, 0, side, wide ? 48 : 110),
+                child: constrained(list),
+              ),
             ),
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Goes below a list that loads in batches ([PagedFeed]): a spinner while
+/// the next batch loads, a retry button after a failure, and a note once
+/// everything is loaded. Shows nothing for a list that is empty and done,
+/// so the page can show its own empty state instead.
+class PagedFeedFooter extends StatelessWidget {
+  const PagedFeedFooter(this.feed, {super.key, this.endText = '已經沒有更多了'});
+
+  final PagedFeed<Object?> feed;
+
+  /// Shown once every batch is loaded.
+  final String endText;
+
+  @override
+  Widget build(BuildContext context) {
+    final muted = TextStyle(
+      fontSize: 12,
+      color: context.colors.mutedForeground,
+    );
+    final Widget child;
+    if (feed.isLoading) {
+      child = Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            width: 14,
+            height: 14,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: context.colors.mutedForeground,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text('載入中…', style: muted),
+        ],
+      );
+    } else if (feed.error != null) {
+      child = TextButton.icon(
+        onPressed: () => feed.loadMore(retry: true),
+        icon: const Icon(Icons.refresh, size: 16),
+        label: const Text('載入失敗，點此重試'),
+      );
+    } else if (!feed.hasMore && feed.items.isNotEmpty) {
+      child = Text(endText, style: muted);
+    } else {
+      return const SizedBox.shrink();
+    }
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Center(child: child),
     );
   }
 }

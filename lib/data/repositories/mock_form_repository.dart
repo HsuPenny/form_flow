@@ -1,5 +1,6 @@
 import '../mock_data.dart';
 import '../models.dart';
+import '../paged_feed.dart';
 import 'form_repository.dart';
 
 /// In-memory [FormRepository] seeded from [MockData]. Nothing is persisted.
@@ -14,6 +15,34 @@ class MockFormRepository implements FormRepository {
 
   @override
   Future<List<FormItem>> fetchForms() async => [..._forms];
+
+  @override
+  Future<PageResult<FormItem>> fetchMyForms({
+    required String memberId,
+    required FormCategory kind,
+    String query = '',
+    int offset = 0,
+    int limit = PageResult.size,
+  }) async {
+    final matches =
+        _forms.where((f) {
+          final me = f.recipients.where((m) => m.id == memberId).firstOrNull;
+          if (me == null || !f.title.contains(query.trim())) return false;
+          return switch (kind) {
+            FormCategory.pending => f.isOpen && !f.hasResponded(me),
+            FormCategory.completed => f.hasResponded(me),
+            FormCategory.expired => f.isExpiredFor(me),
+          };
+        }).toList()..sort(
+          (a, b) => kind == FormCategory.pending
+              ? a.deadline.compareTo(b.deadline)
+              : b.deadline.compareTo(a.deadline),
+        );
+    return PageResult(
+      matches.skip(offset).take(limit).toList(),
+      matches.length,
+    );
+  }
 
   @override
   Future<FormItem> saveForm(FormItem form) async {

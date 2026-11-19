@@ -209,6 +209,13 @@ class FormItem {
 
   bool hasResponded(Member m) => responses.any((r) => r.member == m);
 
+  /// 對 [m] 來說「已截止」：發布過、[m] 沒回覆，而且已不再收回覆
+  /// （過了截止日或已結案）。管理員延後截止日後就不再算已截止。
+  bool isExpiredFor(Member m) =>
+      status != FormStatus.draft &&
+      !hasResponded(m) &&
+      (status == FormStatus.closed || isPastDeadline);
+
   /// [status] as [m] sees it: a published form is done for them once they
   /// have responded, whatever the other recipients have done. A closed form
   /// they never answered stays closed.
