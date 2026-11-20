@@ -285,7 +285,7 @@ class _Sidebar extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           TextButton.icon(
-            onPressed: app.logout,
+            onPressed: () => confirmLogout(context),
             icon: const Icon(Icons.logout, size: 16),
             label: const Text('登出'),
           ),

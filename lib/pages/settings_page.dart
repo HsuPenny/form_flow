@@ -7,6 +7,21 @@ import '../data/text_size_store.dart';
 import '../theme/app_theme.dart';
 import '../widgets/common.dart';
 
+/// 登出 after confirming. Used by the settings page and the wide sidebar.
+Future<void> confirmLogout(BuildContext context) async {
+  final ok = await showConfirmDialog(
+    context,
+    icon: const BrandIcon(BrandGlyph.logout, size: 26),
+    title: '確定要登出？',
+    message: '登出後需要重新輸入信箱與密碼才能回到工作區。',
+    confirmLabel: '登出',
+    destructive: true,
+  );
+  if (!ok || !context.mounted) return;
+  final app = AppScope.of(context);
+  await runOrToast(context, app.logout, failure: '登出失敗，請稍後再試', loading: true);
+}
+
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
 
@@ -226,7 +241,7 @@ class _SettingsPageState extends State<SettingsPage> {
             icon: BrandGlyph.logout,
             title: '登出工作區',
             color: context.colors.destructive,
-            onTap: app.logout,
+            onTap: () => confirmLogout(context),
           ),
         ],
       ),

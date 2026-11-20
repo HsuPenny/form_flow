@@ -1571,6 +1571,158 @@ class _TabsWithSearchState extends State<TabsWithSearch> {
   }
 }
 
+/// Asks before an action that matters, e.g. 結案 or 登出: an icon badge,
+/// a centered title and message, and 取消 / [confirmLabel] side by side.
+/// [subject] (e.g. the form's title) gets its own box so it stands out.
+/// [destructive] paints the badge and the confirm button red. Resolves to
+/// true only when confirmed.
+Future<bool> showConfirmDialog(
+  BuildContext context, {
+  required Widget icon,
+  required String title,
+  required String message,
+  required String confirmLabel,
+  String? subject,
+  bool destructive = false,
+}) async {
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => _ConfirmDialog(
+      icon: icon,
+      title: title,
+      message: message,
+      confirmLabel: confirmLabel,
+      subject: subject,
+      destructive: destructive,
+    ),
+  );
+  return ok ?? false;
+}
+
+class _ConfirmDialog extends StatelessWidget {
+  const _ConfirmDialog({
+    required this.icon,
+    required this.title,
+    required this.message,
+    required this.confirmLabel,
+    required this.subject,
+    required this.destructive,
+  });
+
+  final Widget icon;
+  final String title;
+  final String message;
+  final String confirmLabel;
+  final String? subject;
+  final bool destructive;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final tone = destructive ? c.destructive : c.primary;
+    final subject = this.subject;
+    return Dialog(
+      backgroundColor: c.card,
+      insetPadding: const EdgeInsets.all(24),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadius.base + 6),
+      ),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 360),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(22, 26, 22, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 56,
+                height: 56,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: destructive ? c.destructiveSoft : c.primarySoft,
+                ),
+                child: IconTheme.merge(
+                  data: IconThemeData(color: tone, size: 26),
+                  child: icon,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                title,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              if (subject != null) ...[
+                const SizedBox(height: 12),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: c.muted,
+                    borderRadius: BorderRadius.circular(AppRadius.sm),
+                  ),
+                  child: Text(
+                    subject,
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 12),
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 13,
+                  height: 1.6,
+                  color: c.mutedForeground,
+                ),
+              ),
+              const SizedBox(height: 22),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size(0, 44),
+                      ),
+                      onPressed: () => Navigator.pop(context, false),
+                      child: const Text('取消'),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: FilledButton(
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size(0, 44),
+                        backgroundColor: destructive ? c.destructiveFill : null,
+                      ),
+                      onPressed: () => Navigator.pop(context, true),
+                      child: Text(confirmLabel),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 void showToast(BuildContext context, String message) {
   ScaffoldMessenger.of(context)
     ..hideCurrentSnackBar()

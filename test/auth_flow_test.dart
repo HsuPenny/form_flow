@@ -66,6 +66,16 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('登出工作區'));
       await tester.pumpAndSettle();
+      // Asks first; 取消 keeps the session.
+      expect(find.text('確定要登出？'), findsOneWidget);
+      await tester.tap(find.text('取消'));
+      await tester.pumpAndSettle();
+      expect(state.isLoggedIn, true);
+
+      await tester.tap(find.text('登出工作區'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, '登出'));
+      await tester.pumpAndSettle();
       expect(state.isLoggedIn, false);
       expect(find.text('還沒有帳號？建立帳號'), findsOneWidget);
     });

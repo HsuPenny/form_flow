@@ -23,6 +23,7 @@ class AppColors extends ThemeExtension<AppColors> {
     required this.accent,
     required this.accentSoft,
     required this.destructive,
+    required this.destructiveFill,
     required this.destructiveSoft,
     required this.border,
     required this.input,
@@ -66,6 +67,11 @@ class AppColors extends ThemeExtension<AppColors> {
   final Color accent;
   final Color accentSoft;
   final Color destructive;
+
+  /// Solid red behind white text (destructive confirm buttons). The same in
+  /// both modes, like [primaryFill]: [destructive] is a light text color in
+  /// dark mode and too pale behind white text.
+  final Color destructiveFill;
   final Color destructiveSoft;
   final Color border;
   final Color input;
@@ -103,6 +109,7 @@ class AppColors extends ThemeExtension<AppColors> {
     accent: Color(0xFF2A5DB8),
     accentSoft: Color(0xFFE8F0FC),
     destructive: Color(0xFFD32822),
+    destructiveFill: Color(0xFFC62B25),
     destructiveSoft: Color(0xFFFCEAEA),
     border: Color(0xFFEADFD9),
     input: Color(0xFFD6C8C0),
@@ -133,6 +140,7 @@ class AppColors extends ThemeExtension<AppColors> {
     accent: Color(0xFF9CBFF7),
     accentSoft: Color(0xFF304568),
     destructive: Color(0xFFFF9F99),
+    destructiveFill: Color(0xFFC62B25),
     destructiveSoft: Color(0xFF6E332C),
     border: Color(0xFF52473F),
     input: Color(0xFF6E615B),
@@ -177,6 +185,7 @@ class AppColors extends ThemeExtension<AppColors> {
       accent: c(accent, other.accent),
       accentSoft: c(accentSoft, other.accentSoft),
       destructive: c(destructive, other.destructive),
+      destructiveFill: c(destructiveFill, other.destructiveFill),
       destructiveSoft: c(destructiveSoft, other.destructiveSoft),
       border: c(border, other.border),
       input: c(input, other.input),
