@@ -110,19 +110,18 @@ class AuthHeading extends StatelessWidget {
   }
 }
 
-/// Full-width filled button that shows a spinner while [busy].
+/// Full-width filled button for an auth page's main action. Its pages
+/// cover the screen with [withLoading] while the action runs.
 class AuthSubmitButton extends StatelessWidget {
   const AuthSubmitButton({
     super.key,
     required this.label,
     required this.icon,
-    required this.busy,
     required this.onPressed,
   });
 
   final String label;
   final IconData icon;
-  final bool busy;
 
   /// Null disables the button.
   final VoidCallback? onPressed;
@@ -134,15 +133,7 @@ class AuthSubmitButton extends StatelessWidget {
       child: FilledButton.icon(
         onPressed: onPressed,
         iconAlignment: IconAlignment.end,
-        icon: busy
-            ? const SizedBox.square(
-                dimension: 16,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: Colors.white,
-                ),
-              )
-            : Icon(icon, size: 16),
+        icon: Icon(icon, size: 16),
         label: Text(label),
       ),
     );

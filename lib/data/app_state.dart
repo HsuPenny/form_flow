@@ -7,6 +7,7 @@ import 'models.dart';
 import 'paged_feed.dart';
 import 'repositories/auth_repository.dart';
 import 'repositories/form_repository.dart';
+import 'text_size_store.dart';
 import 'theme_mode_store.dart';
 
 /// App-wide view state. Reads and writes go through the repositories; this
@@ -19,15 +20,21 @@ class AppState extends ChangeNotifier {
     required FormRepository forms,
     ThemeModeStore? themeStore,
     ThemeMode themeMode = ThemeMode.system,
+    TextSizeStore? textSizeStore,
+    TextSize textSize = TextSize.standard,
   }) : _auth = auth,
        _formRepo = forms,
        _themeStore = themeStore ?? MemoryThemeModeStore(),
-       _themeMode = themeMode;
+       _themeMode = themeMode,
+       _textSizeStore = textSizeStore ?? MemoryTextSizeStore(),
+       _textSize = textSize;
 
   final AuthRepository _auth;
   final FormRepository _formRepo;
   final ThemeModeStore _themeStore;
   ThemeMode _themeMode;
+  final TextSizeStore _textSizeStore;
+  TextSize _textSize;
 
   /// 淺色 / 深色 / 跟隨系統. Device-local, so it survives logging out.
   ThemeMode get themeMode => _themeMode;
@@ -42,6 +49,21 @@ class AppState extends ChangeNotifier {
       await _themeStore.save(mode);
     } catch (e) {
       debugPrint('Could not save theme mode: $e');
+    }
+  }
+
+  /// 文字大小 (小 / 標準 / 大 / 特大). Device-local, so it survives logging out.
+  TextSize get textSize => _textSize;
+
+  /// Applies right away; like [setThemeMode], a failed save is only logged.
+  Future<void> setTextSize(TextSize size) async {
+    if (size == _textSize) return;
+    _textSize = size;
+    notifyListeners();
+    try {
+      await _textSizeStore.save(size);
+    } catch (e) {
+      debugPrint('Could not save text size: $e');
     }
   }
 

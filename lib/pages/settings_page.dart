@@ -3,8 +3,24 @@ import 'package:flutter/material.dart';
 import '../data/app_state.dart';
 import '../data/models.dart';
 import '../data/repositories/auth_repository.dart';
+import '../data/text_size_store.dart';
 import '../theme/app_theme.dart';
 import '../widgets/common.dart';
+
+/// 登出 after confirming. Used by the settings page and the wide sidebar.
+Future<void> confirmLogout(BuildContext context) async {
+  final ok = await showConfirmDialog(
+    context,
+    icon: const BrandIcon(BrandGlyph.logout, size: 26),
+    title: '確定要登出？',
+    message: '登出後需要重新輸入信箱與密碼才能回到工作區。',
+    confirmLabel: '登出',
+    destructive: true,
+  );
+  if (!ok || !context.mounted) return;
+  final app = AppScope.of(context);
+  await runOrToast(context, app.logout, failure: '登出失敗，請稍後再試', loading: true);
+}
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -47,6 +63,7 @@ class _SettingsPageState extends State<SettingsPage> {
         department: _app.isAdmin ? _dept : _app.department,
       ),
       failure: '儲存失敗，請稍後再試',
+      loading: true,
     );
     if (saved && mounted) showToast(context, '已儲存變更');
   }
@@ -143,6 +160,24 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
               ),
             ),
+            const _SettingsRow(
+              icon: BrandGlyph.textSize,
+              tone: _Tone.gray,
+              title: '文字大小',
+              subtitle: '會疊加在系統的字體大小設定上',
+              trailing: SizedBox.shrink(),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+              child: SizedBox(
+                width: double.infinity,
+                child: SegmentedTabs(
+                  labels: [for (final s in TextSize.values) s.label],
+                  selected: app.textSize.index,
+                  onChanged: (i) => app.setTextSize(TextSize.values[i]),
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -206,7 +241,7 @@ class _SettingsPageState extends State<SettingsPage> {
             icon: BrandGlyph.logout,
             title: '登出工作區',
             color: context.colors.destructive,
-            onTap: app.logout,
+            onTap: () => confirmLogout(context),
           ),
         ],
       ),
@@ -552,9 +587,12 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
     final app = AppScope.of(context);
     setState(() => _busy = true);
     try {
-      await app.changePassword(
-        currentPassword: _current.text,
-        newPassword: _password.text,
+      await withLoading(
+        context,
+        () => app.changePassword(
+          currentPassword: _current.text,
+          newPassword: _password.text,
+        ),
       );
       if (mounted) Navigator.pop(context, true);
     } on AuthFailure catch (e) {
@@ -616,15 +654,7 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
           listenable: _fields,
           builder: (context, _) => FilledButton(
             onPressed: _canSubmit ? _submit : null,
-            child: _busy
-                ? const SizedBox.square(
-                    dimension: 16,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
-                    ),
-                  )
-                : const Text('更新密碼'),
+            child: const Text('更新密碼'),
           ),
         ),
       ],

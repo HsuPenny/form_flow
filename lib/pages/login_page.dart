@@ -137,11 +137,13 @@ class _LoginPageState extends State<LoginPage>
     setState(() => _busy = true);
     try {
       if (!_signUp) {
-        await app.login(email: email, password: password);
-      } else if (!await app.signUp(
-        email: email,
-        password: password,
-        displayName: name,
+        await withLoading(
+          context,
+          () => app.login(email: email, password: password),
+        );
+      } else if (!await withLoading(
+        context,
+        () => app.signUp(email: email, password: password, displayName: name),
       )) {
         if (mounted) _verifyEmail(email, codeJustSent: true);
       }
@@ -440,15 +442,7 @@ class _LoginPageState extends State<LoginPage>
               child: FilledButton.icon(
                 onPressed: _busy ? null : _enter,
                 iconAlignment: IconAlignment.end,
-                icon: _busy
-                    ? const SizedBox.square(
-                        dimension: 16,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : const Icon(Icons.arrow_forward, size: 16),
+                icon: const Icon(Icons.arrow_forward, size: 16),
                 label: Text(_signUp ? '建立帳號' : '登入'),
               ),
             ),

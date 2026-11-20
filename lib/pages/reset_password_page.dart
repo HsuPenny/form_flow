@@ -50,7 +50,10 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
     final messenger = ScaffoldMessenger.of(context);
     setState(() => _busy = true);
     try {
-      await app.resetPassword(newPassword: _password.text);
+      await withLoading(
+        context,
+        () => app.resetPassword(newPassword: _password.text),
+      );
       _done = true;
       // The app shell is already behind the login page; uncover it. Drop
       // any toast first: the login page and the splash both have a
@@ -101,7 +104,6 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
               builder: (context, _) => AuthSubmitButton(
                 label: '更新密碼',
                 icon: Icons.check,
-                busy: _busy,
                 onPressed: _canSubmit ? _submit : null,
               ),
             ),

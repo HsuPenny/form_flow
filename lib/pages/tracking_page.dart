@@ -96,7 +96,12 @@ class _TrackingPageState extends State<TrackingPage> {
   /// Pull-to-refresh. A failed batch shows its own retry button, so only
   /// the rest toasts on failure.
   Future<void> _refresh() async {
-    final feeds = _reloadFeeds();
+    // Keeps the lists on screen while they reload. The fresh batches already
+    // carry this page's edits, so [_updated] is only dropped once they land.
+    final feeds = Future.wait([
+      _forms.refresh(),
+      _responses.refresh(),
+    ]).then((_) => _updated.clear());
     await runOrToast(
       context,
       () => (_loadSummaryAndDrafts(), _app.refreshMembers()).wait,
@@ -583,6 +588,7 @@ class _RecipientListState extends State<_RecipientList> {
       context,
       () async => widget.onChanged(await change()),
       failure: failure,
+      loading: true,
     );
     return ok;
   }
@@ -636,28 +642,15 @@ class _RecipientListState extends State<_RecipientList> {
   /// 結案 after confirming; it can't be undone.
   Future<void> _close() async {
     final form = widget.form;
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: context.colors.card,
-        title: const Text('結案這份表單？', style: TextStyle(fontSize: 18)),
-        content: Text(
-          '「${form.title}」結案後就不能再填寫或修改回覆，'
-          '也無法延長截止日或新增填寫人員。這個動作無法復原。',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('結案'),
-          ),
-        ],
-      ),
+    final ok = await showConfirmDialog(
+      context,
+      icon: const BrandIcon(BrandGlyph.lock, size: 26),
+      title: '結案這份表單？',
+      subject: form.title,
+      message: '結案後就不能再填寫或修改回覆，也無法延長截止日或新增填寫人員。這個動作無法復原。',
+      confirmLabel: '結案',
     );
-    if (ok != true || !mounted) return;
+    if (!ok || !mounted) return;
     final app = AppScope.of(context);
     final closed = await _update(
       () => app.closeForm(form),
@@ -943,33 +936,22 @@ class _DraftList extends StatelessWidget {
   }
 
   Future<void> _confirmDelete(BuildContext context, FormItem form) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: context.colors.card,
-        title: const Text('刪除表單？', style: TextStyle(fontSize: 18)),
-        content: Text('「${form.title}」會被移除，這個動作無法復原。'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: context.colors.destructive,
-            ),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('刪除'),
-          ),
-        ],
-      ),
+    final ok = await showConfirmDialog(
+      context,
+      icon: const Icon(Icons.delete_outline),
+      title: '刪除表單？',
+      subject: form.title,
+      message: '草稿會被移除，這個動作無法復原。',
+      confirmLabel: '刪除',
+      destructive: true,
     );
-    if (ok != true || !context.mounted) return;
+    if (!ok || !context.mounted) return;
     final app = AppScope.of(context);
     final deleted = await runOrToast(
       context,
       () => app.deleteForm(form),
       failure: '刪除失敗，請稍後再試',
+      loading: true,
     );
     if (!deleted || !context.mounted) return;
     onDeleted(form);

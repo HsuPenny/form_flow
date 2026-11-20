@@ -35,7 +35,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
     final app = AppScope.of(context);
     setState(() => _busy = true);
     try {
-      await app.sendPasswordReset(email: email);
+      await withLoading(context, () => app.sendPasswordReset(email: email));
       if (mounted) _enterCode(email);
     } on AuthFailure catch (e) {
       if (mounted) showToast(context, e.message);
@@ -81,7 +81,6 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
             builder: (context, _) => AuthSubmitButton(
               label: '寄送驗證碼',
               icon: Icons.send_outlined,
-              busy: _busy,
               onPressed: _canSend ? _send : null,
             ),
           ),

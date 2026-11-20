@@ -150,5 +150,50 @@ void main() {
       await stale;
       expect(feed.items.map((f) => f.id), ['new']);
     });
+
+    test(
+      'refresh keeps the items until the first batch replaces them',
+      () async {
+        final next = Completer<PageResult<FormItem>>();
+        var calls = 0;
+        final feed = PagedFeed<FormItem>((offset) {
+          calls++;
+          return calls == 1
+              ? Future.value(PageResult([_form('a'), _form('b')], 3))
+              : next.future;
+        });
+        await feed.reload();
+
+        final refreshing = feed.refresh();
+        expect(feed.isRefreshing, isTrue);
+        expect(feed.items.map((f) => f.id), ['a', 'b']);
+        next.complete(PageResult([_form('c')], 1));
+        await refreshing;
+        expect(feed.isRefreshing, isFalse);
+        expect(feed.items.map((f) => f.id), ['c']);
+        expect(feed.hasMore, isFalse);
+      },
+    );
+
+    test(
+      'a search reload during a refresh clears the refreshing flag',
+      () async {
+        final slow = Completer<PageResult<FormItem>>();
+        var calls = 0;
+        final feed = PagedFeed<FormItem>((offset) {
+          calls++;
+          return calls == 1
+              ? slow.future
+              : Future.value(PageResult([_form('x')], 1));
+        });
+
+        final refreshing = feed.refresh();
+        await feed.reload();
+        slow.complete(PageResult([_form('old')], 1));
+        await refreshing;
+        expect(feed.isRefreshing, isFalse);
+        expect(feed.items.map((f) => f.id), ['x']);
+      },
+    );
   });
 }

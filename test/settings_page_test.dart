@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_form_flow/data/app_state.dart';
 import 'package:flutter_form_flow/data/models.dart';
 import 'package:flutter_form_flow/data/repositories/mock_auth_repository.dart';
 import 'package:flutter_form_flow/data/repositories/mock_form_repository.dart';
+import 'package:flutter_form_flow/data/text_size_store.dart';
 import 'package:flutter_form_flow/main.dart';
 import 'package:flutter_form_flow/widgets/common.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -83,5 +86,46 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(AlertDialog), findsNothing);
     expect(find.text('密碼已更新'), findsOneWidget);
+  });
+
+  testWidgets('text size applies app-wide on top of the system scale', (
+    tester,
+  ) async {
+    final state = await openSettings(tester, Role.member);
+    double scaleOf(String text) =>
+        MediaQuery.textScalerOf(tester.element(find.text(text))).scale(10);
+    expect(scaleOf('文字大小'), closeTo(10, 1e-9));
+
+    await tester.tap(find.text('大'));
+    await tester.pumpAndSettle();
+    expect(state.textSize, TextSize.large);
+    expect(scaleOf('文字大小'), closeTo(11.5, 1e-9));
+  });
+
+  testWidgets('withLoading covers the screen until the action ends', (
+    tester,
+  ) async {
+    await openSettings(tester, Role.member);
+    final done = Completer<int>();
+    final result = withLoading(
+      tester.element(find.text('文字大小')),
+      () => done.future,
+    );
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.byType(LoadingOverlay), findsOneWidget);
+    expect(find.text('處理中…'), findsOneWidget);
+
+    // Taps don't reach the page underneath.
+    await tester.tap(find.text('大'), warnIfMissed: false);
+    await tester.pump();
+    expect(
+      AppScope.of(tester.element(find.text('大'))).textSize,
+      TextSize.standard,
+    );
+
+    done.complete(7);
+    expect(await result, 7);
+    await tester.pump();
+    expect(find.byType(LoadingOverlay), findsNothing);
   });
 }

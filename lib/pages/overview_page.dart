@@ -72,6 +72,10 @@ class _OverviewPageState extends State<OverviewPage> {
   Future<void> _reloadFeeds() =>
       Future.wait([for (final f in _feeds.values) f.reload()]);
 
+  /// Pull-to-refresh: keeps the lists on screen while they reload.
+  Future<void> _refreshFeeds() =>
+      Future.wait([for (final f in _feeds.values) f.refresh()]);
+
   @override
   Widget build(BuildContext context) {
     final app = AppScope.of(context);
@@ -100,7 +104,7 @@ class _OverviewPageState extends State<OverviewPage> {
     return ListPageBody(
       onNearEnd: feed.loadMore,
       // A failed batch shows its own retry button, so no toast here.
-      onRefresh: _reloadFeeds,
+      onRefresh: _refreshFeeds,
       header: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

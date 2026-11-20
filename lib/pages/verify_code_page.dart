@@ -87,7 +87,10 @@ class _VerifyCodePageState extends State<VerifyCodePage> {
     try {
       switch (widget.purpose) {
         case CodePurpose.signUp:
-          await app.verifySignUp(email: widget.email, code: code);
+          await withLoading(
+            context,
+            () => app.verifySignUp(email: widget.email, code: code),
+          );
           // The app shell is already behind the login page; uncover it. Drop
           // any toast first: the login page and the splash both have a
           // Scaffold while they cross-fade, and a SnackBar in both trips the
@@ -95,7 +98,10 @@ class _VerifyCodePageState extends State<VerifyCodePage> {
           messenger.removeCurrentSnackBar();
           navigator.popUntil((route) => route.isFirst);
         case CodePurpose.passwordReset:
-          await app.verifyRecoveryCode(email: widget.email, code: code);
+          await withLoading(
+            context,
+            () => app.verifyRecoveryCode(email: widget.email, code: code),
+          );
           // The code is used up, so going back should skip this page.
           navigator.pushReplacement(
             MaterialPageRoute<void>(builder: (_) => const ResetPasswordPage()),
@@ -117,10 +123,15 @@ class _VerifyCodePageState extends State<VerifyCodePage> {
     final app = AppScope.of(context);
     setState(() => _busy = true);
     try {
-      await switch (widget.purpose) {
-        CodePurpose.signUp => app.resendSignUpCode(email: widget.email),
-        CodePurpose.passwordReset => app.sendPasswordReset(email: widget.email),
-      };
+      await withLoading(
+        context,
+        () => switch (widget.purpose) {
+          CodePurpose.signUp => app.resendSignUpCode(email: widget.email),
+          CodePurpose.passwordReset => app.sendPasswordReset(
+            email: widget.email,
+          ),
+        },
+      );
       if (!mounted) return;
       showToast(context, '已重新寄送驗證碼');
       _code.clear();
@@ -189,7 +200,7 @@ class _VerifyCodePageState extends State<VerifyCodePage> {
             ),
           ),
           const SizedBox(height: 20),
-          Center(child: _busy ? _spinner() : _resendButton()),
+          Center(child: _resendButton()),
           const SizedBox(height: 12),
           Divider(height: 1, color: context.colors.border),
           const SizedBox(height: 4),
@@ -210,18 +221,10 @@ class _VerifyCodePageState extends State<VerifyCodePage> {
     );
   }
 
-  Widget _spinner() => const Padding(
-    padding: EdgeInsets.all(12),
-    child: SizedBox.square(
-      dimension: 16,
-      child: CircularProgressIndicator(strokeWidth: 2),
-    ),
-  );
-
   Widget _resendButton() {
     final waiting = _wait > 0;
     return TextButton(
-      onPressed: waiting ? null : _resend,
+      onPressed: waiting || _busy ? null : _resend,
       child: Text(
         waiting ? '重新發送驗證碼（$_wait秒）' : '重新發送驗證碼',
         style: const TextStyle(

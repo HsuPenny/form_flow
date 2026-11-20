@@ -111,6 +111,7 @@ class _CreateFormPageState extends State<CreateFormPage> {
       context,
       () => app.saveForm(form),
       failure: '儲存失敗，請稍後再試',
+      loading: true,
     );
     if (!saved || !mounted) return;
     showToast(context, publish ? '表單已發佈' : (draft == null ? '已儲存草稿' : '已更新草稿'));

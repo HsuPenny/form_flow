@@ -7,6 +7,7 @@ import 'data/api/api_client.dart';
 import 'data/app_state.dart';
 import 'data/repositories/supabase_auth_repository.dart';
 import 'data/repositories/supabase_form_repository.dart';
+import 'data/text_size_store.dart';
 import 'data/theme_mode_store.dart';
 import 'pages/login_page.dart';
 import 'pages/shell.dart';
@@ -48,11 +49,18 @@ Future<void> main() async {
   final api = SupabaseApi(url: supabaseUrl, key: supabaseKey);
   // Read before the first frame so a dark-mode user never sees a light flash.
   final themeStore = PrefsThemeModeStore();
+  final textSizeStore = PrefsTextSizeStore();
+  final (themeMode, textSize) = await (
+    themeStore.load(),
+    textSizeStore.load(),
+  ).wait;
   final state = AppState(
     auth: SupabaseAuthRepository(api),
     forms: SupabaseFormRepository(api.dio),
     themeStore: themeStore,
-    themeMode: await themeStore.load(),
+    themeMode: themeMode,
+    textSizeStore: textSizeStore,
+    textSize: textSize,
   );
   // Not awaited: the app draws right away and shows the backdrop until the
   // saved session (if any) is restored.
@@ -69,7 +77,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return AppScope(
       state: state,
-      // Rebuilds only the MaterialApp when the theme mode changes.
+      // Rebuilds only the MaterialApp when the theme mode or text size changes.
       child: ListenableBuilder(
         listenable: state,
         builder: (context, child) => MaterialApp(
@@ -84,7 +92,16 @@ class MyApp extends StatelessWidget {
             value: Theme.of(context).brightness == Brightness.dark
                 ? SystemUiOverlayStyle.light
                 : SystemUiOverlayStyle.dark,
-            child: child!,
+            // The in-app 文字大小 on top of the system's font size.
+            child: MediaQuery(
+              data: MediaQuery.of(context).copyWith(
+                textScaler: AppTextScaler(
+                  MediaQuery.textScalerOf(context),
+                  state.textSize.scale,
+                ),
+              ),
+              child: child!,
+            ),
           ),
           home: child,
         ),

@@ -67,6 +67,7 @@ class _FillFormPageState extends State<FillFormPage> {
       context,
       () => app.submitResponse(widget.form, Map.of(_answers)),
       failure: '送出失敗，請稍後再試',
+      loading: true,
     );
     if (sent && mounted) setState(() => _submitted = true);
   }
